@@ -1,0 +1,150 @@
+.file-dropdown {
+  padding: 8px;
+  border: 1px solid #ccc;
+  background: #fafafa;
+  border-radius: 4px;
+  margin-top: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  flex: 1 1 200px;
+  min-width: 120px;
+  margin: 2px;
+  background: #fff;
+  cursor: grab;
+}
+
+.file-item:active {
+  cursor: grabbing;
+}
+
+.file-preview {
+  flex: 1 1 auto;
+  max-width: 150px;
+  max-height: 80px;
+  overflow: hidden;
+}
+
+.file-preview img,
+.file-preview embed {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.file-item.add-item {
+  justify-content: center;
+}
+
+.files-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.btn-download-all {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-download-all:hover {
+  background: #1d4ed8;
+}
+
+.file-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.file-item:hover .file-actions {
+  opacity: 1;
+}
+
+.btn-download {
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+.file-name {
+  flex: 1;
+  cursor: pointer;
+  color: #007BFF;
+  text-decoration: underline;
+  margin-right: 8px;
+  word-break: break-all;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-small {
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+  cursor: pointer;
+}
+
+.btn-small:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-delete {
+  color: #c00;
+  border-color: #c00;
+}
+
+.btn-upload {
+  cursor: pointer;
+  padding: 4px 8px;
+  border: 1px dashed #666;
+  border-radius: 3px;
+  color: #333;
+  display: inline-block;
+}
+
+.btn-upload:hover {
+  background: #eee;
+}
+
+.file-dropdown {
+  padding: 8px;
+  border: 1px solid #ccc;
+  background: #fafafa;
+  border-radius: 4px;
+  margin-top: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.file-controls {
+  display: none;
+}
