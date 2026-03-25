@@ -35,10 +35,26 @@ const CHART_COLORS = [
   '#9E6575'  // Rosa antiguo
 ];
 
+const MultiLineYAxisTick = ({ x, y, payload, compact = false }) => {
+  const value = String(payload?.value ?? '');
+  const lines = value.split('\n').slice(0, 2);
+  const lineHeight = compact ? 10 : 12;
+
+  return (
+    <text x={x} y={y} textAnchor="end" fill="#44546A" fontSize={compact ? 9 : 10}>
+      {lines.map((line, idx) => (
+        <tspan key={`${line}-${idx}`} x={x} dy={idx === 0 ? 3 : lineHeight}>
+          {line}
+        </tspan>
+      ))}
+    </text>
+  );
+};
+
 // SVG path for bar with rounded end (right for positive, left for negative)
 const roundedBarPath = (x, y, w, h) => {
   if (!w || !h) return '';
-  const r = Math.min(4, Math.abs(w) / 2, h / 2);
+  const r = Math.min(7, Math.abs(w) / 2, h / 2);
   if (w >= 0) {
     return `M${x},${y} L${x+w-r},${y} Q${x+w},${y} ${x+w},${y+r} L${x+w},${y+h-r} Q${x+w},${y+h} ${x+w-r},${y+h} L${x},${y+h} Z`;
   }
@@ -63,7 +79,7 @@ const makeCenteredBar = (dataKey, otherKey, color, fmtLabel) => (props) => {
     <g>
       <path d={d} fill={color} />
       {label && (
-        <text x={labelX} y={adjustedY + height / 2} dy="0.35em" fill={color} fontSize={10} fontWeight={600} textAnchor={anchor}>
+        <text x={labelX} y={adjustedY + height / 2} dy="0.35em" fill={color} fontSize={11} fontWeight={700} textAnchor={anchor}>
           {label}
         </text>
       )}
@@ -1101,7 +1117,7 @@ const DashboardFinanciero = ({ filters }) => {
 
   // Preparar datos de seguimiento (pivot por semana)
   const prepareSeguimientoData = (data) => {
-    const semanas = [...new Set(data.map(d => d.semana))].sort();
+    const semanas = [...new Set(data.map(d => d.semana))].sort((a, b) => Number(a) - Number(b));
     const grouped = {};
     
     data.forEach(item => {
@@ -1143,6 +1159,16 @@ const DashboardFinanciero = ({ filters }) => {
     const symbol = normalizedDivisa === 'USD' ? '$' : 'S/';
     return `${symbol} ${fmtNum(value)}`;
   };
+
+  const dualBarSize = isMobile ? 18 : 22;
+  const dualChartHeight = (items) => Math.max(180, items.length * (isMobile ? 64 : 74) + 56);
+  const dualChartMargin = { right: isMobile ? 60 : 130, left: isMobile ? 8 : 12, top: 8, bottom: 8 };
+  const dualAxisWidth = isMobile ? 92 : 220;
+
+  const singleBarSize = isMobile ? 20 : 26;
+  const singleChartHeight = (items) => Math.max(180, items.length * (isMobile ? 64 : 76) + 56);
+  const singleChartMargin = { right: isMobile ? 60 : 110, left: isMobile ? 8 : 12, top: 8, bottom: 8 };
+  const singleAxisWidth = isMobile ? 92 : 220;
 
   return (
     <div className="dashboard-financiero">
@@ -1272,11 +1298,11 @@ const DashboardFinanciero = ({ filters }) => {
               {cobrarChart.length === 0 ? (
                 <p className="empty-message">No hay datos para graficar</p>
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(120, cobrarChart.length * (isMobile ? 60 : 70) + 40)}>
-                  <BarChart data={cobrarChart} layout="vertical" barSize={14} margin={{ right: isMobile ? 50 : 110, left: isMobile ? 5 : 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <ResponsiveContainer width="100%" height={dualChartHeight(cobrarChart)}>
+                  <BarChart data={cobrarChart} layout="vertical" barSize={dualBarSize} barCategoryGap="22%" margin={dualChartMargin}>
+                    <CartesianGrid strokeDasharray="4 4" stroke="#D7DEE7" horizontal={true} vertical={true} />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={isMobile ? 80 : 180} tick={{ fontSize: isMobile ? 9 : 11 }} />
+                    <YAxis dataKey="label" type="category" width={dualAxisWidth} tick={<MultiLineYAxisTick compact={isMobile} />} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0]?.payload;
@@ -1409,11 +1435,11 @@ const DashboardFinanciero = ({ filters }) => {
               {pagarChart.length === 0 ? (
                 <p className="empty-message">No hay datos para graficar</p>
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(120, pagarChart.length * (isMobile ? 60 : 70) + 40)}>
-                  <BarChart data={pagarChart} layout="vertical" barSize={14} margin={{ right: isMobile ? 50 : 110, left: isMobile ? 5 : 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <ResponsiveContainer width="100%" height={dualChartHeight(pagarChart)}>
+                  <BarChart data={pagarChart} layout="vertical" barSize={dualBarSize} barCategoryGap="22%" margin={dualChartMargin}>
+                    <CartesianGrid strokeDasharray="4 4" stroke="#D7DEE7" horizontal={true} vertical={true} />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={isMobile ? 80 : 180} tick={{ fontSize: isMobile ? 9 : 11 }} />
+                    <YAxis dataKey="label" type="category" width={dualAxisWidth} tick={<MultiLineYAxisTick compact={isMobile} />} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0]?.payload;
@@ -1551,11 +1577,11 @@ const DashboardFinanciero = ({ filters }) => {
               {margenChart.length === 0 ? (
                 <p className="empty-message">No hay datos para graficar</p>
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(120, margenChart.length * (isMobile ? 60 : 70) + 40)}>
-                  <BarChart data={margenChart} layout="vertical" barSize={14} margin={{ right: isMobile ? 50 : 110, left: isMobile ? 5 : 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <ResponsiveContainer width="100%" height={dualChartHeight(margenChart)}>
+                  <BarChart data={margenChart} layout="vertical" barSize={dualBarSize} barCategoryGap="22%" margin={dualChartMargin}>
+                    <CartesianGrid strokeDasharray="4 4" stroke="#D7DEE7" horizontal={true} vertical={true} />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={isMobile ? 80 : 180} tick={{ fontSize: isMobile ? 9 : 11 }} />
+                    <YAxis dataKey="label" type="category" width={dualAxisWidth} tick={<MultiLineYAxisTick compact={isMobile} />} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0]?.payload;
@@ -1680,11 +1706,11 @@ const DashboardFinanciero = ({ filters }) => {
               {tnChart.length === 0 ? (
                 <p className="empty-message">No hay datos para graficar</p>
               ) : (
-                <ResponsiveContainer width="100%" height={Math.max(120, tnChart.length * (isMobile ? 60 : 70) + 40)}>
-                  <BarChart data={tnChart} layout="vertical" barSize={30} margin={{ right: isMobile ? 50 : 90, left: isMobile ? 5 : 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e0e0e0" />
+                <ResponsiveContainer width="100%" height={singleChartHeight(tnChart)}>
+                  <BarChart data={tnChart} layout="vertical" barSize={singleBarSize} barCategoryGap="24%" margin={singleChartMargin}>
+                    <CartesianGrid strokeDasharray="4 4" stroke="#D7DEE7" horizontal={true} vertical={true} />
                     <XAxis type="number" hide />
-                    <YAxis dataKey="label" type="category" width={isMobile ? 80 : 200} tick={{ fontSize: isMobile ? 9 : 11 }} />
+                    <YAxis dataKey="label" type="category" width={singleAxisWidth} tick={<MultiLineYAxisTick compact={isMobile} />} />
                     <Tooltip formatter={(value) => [`${fmtNum(value)} TN`, 'Tonelaje']} contentStyle={{ borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', border: '1px solid #e0e0e0' }} />
                     {!isMobile && <Legend />}
                     <Bar dataKey="total" name="Peso Ticket" fill={COLORS.PEN} radius={[0, 6, 6, 0]}>
