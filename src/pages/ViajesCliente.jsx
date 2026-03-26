@@ -5,7 +5,6 @@ import {
 } from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import XLSX from 'xlsx-js-style';
 import logoEmpresa from '../assets/Images/logo-empresa.png';
 import './ViajesCliente.css';
 
@@ -109,6 +108,13 @@ const ViajesCliente = () => {
     });
   };
 
+  const formatFechaCorta = (fecha) => {
+    if (!fecha) return '-';
+    const dateStr = typeof fecha === 'string' ? fecha.substring(0, 10) : new Date(fecha).toISOString().substring(0, 10);
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
   const limpiarFiltros = () => {
     setSelectedCliente('');
     setSelectedPlaca('');
@@ -119,6 +125,13 @@ const ViajesCliente = () => {
     if (!text) return '';
     return text.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
   };
+
+  const toBase64 = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 
   const descargarPDF = async () => {
     if (!contentRef.current) return;
@@ -178,8 +191,9 @@ const ViajesCliente = () => {
 
       const captureChartImage = async () => {
         if (!graficPlacaRef.current) return null;
-        const clone = graficPlacaRef.current.cloneNode(true);
-        clone.style.width = `${graficPlacaRef.current.scrollWidth}px`;
+        const sourceChart = graficPlacaRef.current.querySelector('.grafico-container') || graficPlacaRef.current;
+        const clone = sourceChart.cloneNode(true);
+        clone.style.width = `${sourceChart.scrollWidth}px`;
         clone.style.maxWidth = 'none';
         clone.style.background = '#ffffff';
         clone.style.opacity = '1';
@@ -188,14 +202,11 @@ const ViajesCliente = () => {
           btn.style.display = 'none';
         });
 
-        const heading = clone.querySelector('h2');
-        if (heading) heading.style.marginBottom = '8px';
-
         const wrapper = document.createElement('div');
         wrapper.style.position = 'fixed';
         wrapper.style.left = '-10000px';
         wrapper.style.top = '0';
-        wrapper.style.width = `${graficPlacaRef.current.scrollWidth}px`;
+        wrapper.style.width = `${sourceChart.scrollWidth}px`;
         wrapper.style.background = '#ffffff';
         wrapper.appendChild(clone);
         document.body.appendChild(wrapper);
@@ -323,15 +334,16 @@ const ViajesCliente = () => {
         y += rowHeight;
       });
 
+      const chartTitle = isThreeFiltersSelected ? 'Tonelaje por Fecha' : 'Traslados por Placa';
       pdf.setTextColor(51, 51, 51);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(12);
-      pdf.text('Traslados por Placa', chartX, bodyY + 12);
+      pdf.text(chartTitle, chartX, bodyY + 12);
       pdf.setDrawColor(27, 116, 48);
       pdf.setLineWidth(1.2);
       pdf.line(chartX, bodyY + 16, chartX + 130, bodyY + 16);
 
-      const chartTop = bodyY + 22;
+      const chartTop = bodyY + 18;
       const chartHeight = bodyH - 4;
       pdf.setFillColor(255, 255, 255);
       pdf.setDrawColor(235, 235, 235);
@@ -362,46 +374,142 @@ const ViajesCliente = () => {
     }
   };
 
-  const descargarDiasExcel = () => {
+  const descargarDiasExcel = async () => {
     if (diasViajes.length === 0) return;
-    const wb = XLSX.utils.book_new();
-    const colCount = 3;
-    const titleStyle = { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center', vertical: 'center' } };
-    const filterStyle = { font: { bold: false, sz: 11, color: { rgb: '333333' } }, fill: { fgColor: { rgb: 'E8F5E9' } }, alignment: { horizontal: 'center', vertical: 'center' } };
-    const filterParts = [];
-    if (selectedMes) filterParts.push(capitalizeText(selectedMes));
-    if (selectedCliente) filterParts.push(capitalizeText(selectedCliente));
-    if (selectedPlaca) filterParts.push(`Placa: ${selectedPlaca.toUpperCase()}`);
-    const filterText = filterParts.length > 0 ? filterParts.join(' \u2014 ') : 'Sin filtros';
+    try {
+      const { default: ExcelJS } = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Dias con Viajes');
+      worksheet.views = [{ state: 'frozen', ySplit: 6 }];
 
-    const titleRow = Array(colCount).fill({ v: '', s: titleStyle });
-    titleRow[0] = { v: 'D\u00edas con Viajes', s: titleStyle };
-    const filterRow = Array(colCount).fill({ v: '', s: filterStyle });
-    filterRow[0] = { v: filterText, s: filterStyle };
-    const emptyRow = Array(colCount).fill({ v: '' });
+      worksheet.columns = [
+        { key: 'fecha', width: 18 },
+        { key: 'traslados', width: 18 },
+        { key: 'tonelaje', width: 34 },
+      ];
 
-    const hStyle = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: '145A25' } } } };
-    const cellL = { font: { sz: 10 }, alignment: { horizontal: 'left' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellR = { font: { sz: 10 }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellN = { font: { sz: 10 }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
+      worksheet.mergeCells('A1:A2');
+      worksheet.getCell('A1').value = '';
 
-    const rows = [
-      titleRow, filterRow, emptyRow,
-      [{ v: 'Fecha', s: hStyle }, { v: 'Traslados', s: hStyle }, { v: 'Tonelaje Recibido (TN)', s: hStyle }],
-      ...diasViajes.map(dia => [
-        { v: formatFecha(dia.fecha), s: cellL },
-        { v: parseInt(dia.traslados) || 0, t: 'n', s: cellN },
-        { v: Math.round((Number(dia.tonelaje_recibido) || 0) * 100) / 100, t: 'n', s: cellR },
-      ])
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 25 }, { wch: 14 }, { wch: 22 }];
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } },
-    ];
-    XLSX.utils.book_append_sheet(wb, ws, 'D\u00edas con Viajes');
-    XLSX.writeFile(wb, 'Dias_con_Viajes.xlsx');
+      worksheet.mergeCells('B1:C1');
+      worksheet.getCell('B1').value = 'ECOTRANSPORTE - REPORTE DE DIAS CON VIAJES';
+      worksheet.getCell('B1').font = { bold: true, size: 15, color: { argb: 'FF1B7430' } };
+      worksheet.getCell('B1').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+      worksheet.mergeCells('B2:C2');
+      worksheet.getCell('B2').value = `Generado: ${new Date().toLocaleString('es-PE')}`;
+      worksheet.getCell('B2').font = { size: 10, color: { argb: 'FF4B5563' } };
+      worksheet.getCell('B2').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+      const filterParts = [];
+      if (selectedMes) filterParts.push(capitalizeText(selectedMes));
+      if (selectedCliente) filterParts.push(capitalizeText(selectedCliente));
+      if (selectedPlaca) filterParts.push(`Placa: ${selectedPlaca.toUpperCase()}`);
+      const filterText = filterParts.length > 0 ? filterParts.join(' - ') : 'Sin filtros';
+
+      worksheet.mergeCells('A4:C4');
+      worksheet.getCell('A4').value = `Total dias exportados: ${diasViajes.length} | Filtros: ${filterText}`;
+      worksheet.getCell('A4').font = { bold: true, size: 10, color: { argb: 'FF374151' } };
+      worksheet.getCell('A4').alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+      worksheet.getCell('A4').fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5F4E7' },
+      };
+
+      try {
+        const logoResponse = await fetch(logoEmpresa);
+        const logoBlob = await logoResponse.blob();
+        const logoBase64 = await toBase64(logoBlob);
+        const imageId = workbook.addImage({
+          base64: logoBase64,
+          extension: 'png',
+        });
+        worksheet.addImage(imageId, {
+          tl: { col: 0.08, row: 0.12 },
+          ext: { width: 128, height: 52 },
+          editAs: 'oneCell',
+        });
+      } catch (logoError) {
+        console.warn('No se pudo insertar el logo en Excel:', logoError);
+      }
+
+      const headerRowNumber = 6;
+      const headerRow = worksheet.getRow(headerRowNumber);
+      headerRow.values = ['Fecha', 'Traslados', 'Tonelaje Recibido (TN)'];
+      headerRow.height = 24;
+
+      for (let col = 1; col <= 3; col++) {
+        const cell = headerRow.getCell(col);
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF1B7430' },
+        };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF15803D' } },
+          left: { style: 'thin', color: { argb: 'FF15803D' } },
+          bottom: { style: 'thin', color: { argb: 'FF15803D' } },
+          right: { style: 'thin', color: { argb: 'FF15803D' } },
+        };
+      }
+
+      diasViajes.forEach((dia) => {
+        const trasladoCount = parseInt(dia.traslados, 10) || 0;
+        const tonelajeRecibido = Number(dia.tonelaje_recibido);
+
+        const row = worksheet.addRow({
+          fecha: formatFecha(dia.fecha),
+          traslados: trasladoCount,
+          tonelaje: Number.isFinite(tonelajeRecibido) ? tonelajeRecibido : 0,
+        });
+
+        row.eachCell((cell, colNumber) => {
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: colNumber === 1 ? 'left' : 'center',
+            wrapText: false,
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          };
+        });
+
+        row.getCell(3).numFmt = '#,##0.00';
+      });
+
+      worksheet.autoFilter = {
+        from: { row: headerRowNumber, column: 1 },
+        to: { row: headerRowNumber, column: 3 },
+      };
+
+      worksheet.getRow(1).height = 40;
+      worksheet.getRow(2).height = 22;
+      worksheet.getRow(4).height = 24;
+
+      worksheet.getCell('A1').value = '';
+
+      const fileName = `dias_con_viajes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exportando dias con viajes a Excel:', error);
+    }
   };
 
   const descargarPlacaPDF = async () => {
@@ -515,6 +623,15 @@ const ViajesCliente = () => {
       setExportingPlacaPdf(false);
     }
   };
+
+  const isThreeFiltersSelected = Boolean(selectedMes && selectedCliente && selectedPlaca);
+  const toneladasPorFecha = (diasViajes || []).map((dia) => ({
+    fechaLabel: formatFechaCorta(dia.fecha),
+    fechaFull: formatFecha(dia.fecha),
+    tonelaje: Number(dia.tonelaje_recibido) || 0,
+    traslados: parseInt(dia.traslados, 10) || 0,
+  }));
+  const hasChartData = isThreeFiltersSelected ? toneladasPorFecha.length > 0 : viajesPorPlaca.length > 0;
 
   return (
     <div className="viajes-cliente-container">
@@ -648,46 +765,85 @@ const ViajesCliente = () => {
             {/* Gráfico de barras */}
             <div className="seccion-grafico" ref={graficPlacaRef}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h2 style={{ margin: 0 }}>Traslados por Placa</h2>
+                <h2 style={{ margin: 0 }}>
+                  {isThreeFiltersSelected ? 'Tonelaje por Fecha' : 'Traslados por Placa'}
+                </h2>
                 <button
                   className="btn-limpiar"
                   onClick={descargarPlacaPDF}
-                  disabled={exportingPlacaPdf || viajesPorPlaca.length === 0}
+                  disabled={exportingPlacaPdf || !hasChartData}
                   style={{ background: '#1B7430', color: '#fff', border: 'none', fontSize: 13, padding: '6px 14px' }}
                 >
                   {exportingPlacaPdf ? 'Generando...' : '\uD83D\uDCE5 Descargar PDF'}
                 </button>
               </div>
-              {viajesPorPlaca.length === 0 ? (
+              {!hasChartData ? (
                 <p className="empty-message">No hay datos para mostrar</p>
               ) : (
                 <div className="grafico-container">
-                  <ResponsiveContainer width="100%" height={Math.max(400, viajesPorPlaca.length * 25)}>
-                    <BarChart
-                      data={viajesPorPlaca}
-                      layout="vertical"
-                      margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" hide />
-                      <YAxis
-                        dataKey="placa"
-                        type="category"
-                        width={80}
-                        tick={{ fontSize: 11, fill: '#555' }}
-                      />
-                      <Tooltip
-                        formatter={(value) => [`${value} traslados`, 'Traslados']}
-                        labelFormatter={(label) => `Placa: ${label}`}
-                      />
-                      <Bar dataKey="viajes" name="Traslados">
-                        {viajesPorPlaca.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                        <LabelList dataKey="viajes" position="right" style={{ fontSize: 11, fontWeight: 600, fill: '#333' }} formatter={(value) => Number(value) === 1 ? `${value} traslado` : `${value} traslados`} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {isThreeFiltersSelected ? (
+                    <ResponsiveContainer width="100%" height={Math.max(340, toneladasPorFecha.length * 40)}>
+                      <BarChart
+                        data={toneladasPorFecha}
+                        margin={{ top: 10, right: 30, left: 10, bottom: 32 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          dataKey="fechaLabel"
+                          tick={{ fontSize: 11, fill: '#555' }}
+                          angle={-20}
+                          textAnchor="end"
+                          height={52}
+                        />
+                        <YAxis tick={{ fontSize: 11, fill: '#555' }} width={75} />
+                        <Tooltip
+                          formatter={(value, _name, payload) => [
+                            `${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TN`,
+                            `Tonelaje (${payload?.payload?.traslados || 0} traslados)`
+                          ]}
+                          labelFormatter={(_label, payload) => payload?.[0]?.payload?.fechaFull || 'Fecha'}
+                        />
+                        <Bar dataKey="tonelaje" name="Tonelaje Recibido">
+                          {toneladasPorFecha.map((entry, index) => (
+                            <Cell key={`cell-ton-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                          <LabelList
+                            dataKey="tonelaje"
+                            position="top"
+                            style={{ fontSize: 10, fontWeight: 600, fill: '#333' }}
+                            formatter={(value) => `${Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TN`}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={Math.max(400, viajesPorPlaca.length * 25)}>
+                      <BarChart
+                        data={viajesPorPlaca}
+                        layout="vertical"
+                        margin={{ top: 10, right: 60, left: 10, bottom: 10 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="placa"
+                          type="category"
+                          width={80}
+                          tick={{ fontSize: 11, fill: '#555' }}
+                        />
+                        <Tooltip
+                          formatter={(value) => [`${value} traslados`, 'Traslados']}
+                          labelFormatter={(label) => `Placa: ${label}`}
+                        />
+                        <Bar dataKey="viajes" name="Traslados">
+                          {viajesPorPlaca.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                          <LabelList dataKey="viajes" position="right" style={{ fontSize: 11, fontWeight: 600, fill: '#333' }} formatter={(value) => Number(value) === 1 ? `${value} traslado` : `${value} traslados`} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               )}
             </div>

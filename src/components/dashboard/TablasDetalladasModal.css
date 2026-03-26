@@ -134,8 +134,22 @@
 /* Body */
 .tablas-modal-body {
   flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   padding: 6px 10px;
+}
+
+.tablas-print-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tablas-print-wrap > h3 {
+  flex-shrink: 0;
 }
 
 .loading-section,
@@ -177,7 +191,9 @@
 }
 
 .tabla-scroll-container {
-  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   border: 1px solid #E2E8F0;
   border-radius: 6px;
 }
@@ -357,6 +373,7 @@
 
   .tablas-modal-body {
     padding: 4px 6px;
+    overflow: hidden;
   }
 
   .tabla-detallada thead th.col-cliente,
@@ -441,7 +458,7 @@
 
   .tablas-modal-body {
     padding: 4px;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
   }
 
   .tabla-detallada-section {

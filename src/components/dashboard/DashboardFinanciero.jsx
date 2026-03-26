@@ -1160,12 +1160,12 @@ const DashboardFinanciero = ({ filters }) => {
     return `${symbol} ${fmtNum(value)}`;
   };
 
-  const dualBarSize = isMobile ? 18 : 22;
+  const dualBarSize = isMobile ? 24 : 28;
   const dualChartHeight = (items) => Math.max(180, items.length * (isMobile ? 64 : 74) + 56);
   const dualChartMargin = { right: isMobile ? 60 : 130, left: isMobile ? 8 : 12, top: 8, bottom: 8 };
   const dualAxisWidth = isMobile ? 92 : 220;
 
-  const singleBarSize = isMobile ? 20 : 26;
+  const singleBarSize = isMobile ? 26 : 32;
   const singleChartHeight = (items) => Math.max(180, items.length * (isMobile ? 64 : 76) + 56);
   const singleChartMargin = { right: isMobile ? 60 : 110, left: isMobile ? 8 : 12, top: 8, bottom: 8 };
   const singleAxisWidth = isMobile ? 92 : 220;

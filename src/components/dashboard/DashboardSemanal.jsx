@@ -310,29 +310,37 @@ const DashboardSemanal = ({ filters: globalFilters }) => {
       const headerBottomY = addHeader(pdf, title, subtitle, logoDataUrl);
       const availableWidth = pageWidth - marginX * 2;
       const pageContentHeight = pageHeight - headerBottomY - 16;
+      const sectionGap = 12;
+      const naturalSizes = sectionCanvases.map((canvas) => {
+        const width = availableWidth;
+        const height = (canvas.height * width) / canvas.width;
+        return { width, height };
+      });
+
+      const totalNaturalHeight = naturalSizes.reduce((sum, size) => sum + size.height, 0);
+      const totalGaps = Math.max(0, sectionCanvases.length - 1) * sectionGap;
+      const availableHeightForCharts = Math.max(1, pageContentHeight - totalGaps);
+      const fitScale = totalNaturalHeight > availableHeightForCharts
+        ? (availableHeightForCharts / totalNaturalHeight)
+        : 1;
+
       let y = headerBottomY;
 
       for (let i = 0; i < sectionCanvases.length; i++) {
         const canvas = sectionCanvases[i];
         const imgData = canvas.toDataURL('image/png');
 
-        let renderWidth = availableWidth;
-        let renderHeight = (canvas.height * renderWidth) / canvas.width;
-
-        if (renderHeight > pageContentHeight) {
-          const fitRatio = pageContentHeight / renderHeight;
-          renderWidth = renderWidth * fitRatio;
-          renderHeight = pageContentHeight;
-        }
+        const renderWidth = naturalSizes[i].width * fitScale;
+        const renderHeight = naturalSizes[i].height * fitScale;
+        const x = marginX + (availableWidth - renderWidth) / 2;
 
         if (y + renderHeight > pageHeight - 16) {
           pdf.addPage();
           y = addHeader(pdf, title, subtitle, logoDataUrl);
         }
 
-        const x = marginX + (availableWidth - renderWidth) / 2;
         pdf.addImage(imgData, 'PNG', x, y, renderWidth, renderHeight);
-        y += renderHeight + 12;
+        y += renderHeight + sectionGap;
       }
 
       pdf.save(fileName);

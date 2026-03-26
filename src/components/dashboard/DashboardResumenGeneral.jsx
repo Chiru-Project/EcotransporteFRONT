@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { dashboardService } from '../../services/api';
 import TablasDetalladasModal from './TablasDetalladasModal';
 import ReporteGuiasModal from './ReporteGuiasModal';
@@ -213,7 +214,13 @@ const DashboardResumenGeneral = () => {
                   <tr className="fila-cliente-header fila-cliente-resumen" onClick={() => toggleClient(grupo.cliente)}>
                     <td>
                       <button className="btn-toggle-cliente" type="button" aria-label={`Expandir ${grupo.cliente}`}>
-                        {expandedClients[grupo.cliente] ? '▼' : '▶'}
+                        <motion.span
+                          style={{ display: 'inline-block' }}
+                          animate={{ rotate: expandedClients[grupo.cliente] ? 90 : 0 }}
+                          transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                          ▶
+                        </motion.span>
                       </button>
                       <span className="cliente-name">{grupo.cliente}</span>
                     </td>
@@ -221,14 +228,22 @@ const DashboardResumenGeneral = () => {
                     <td>${fmtNum(grupo.totals.usd)}</td>
                     <td>S/{fmtNum(grupo.totals.pen)}</td>
                   </tr>
-                  {expandedClients[grupo.cliente] && grupo.materiales.map((mat) => (
-                    <tr key={`${grupo.cliente}-${mat.label}`}>
-                      <td className="material-cell">{mat.label}</td>
-                      <td>{fmtNum(mat?.data?.general?.tne)} TN</td>
-                      <td>${fmtNum(getImporteByDivisa(mat, 'USD'))}</td>
-                      <td>S/{fmtNum(getImporteByDivisa(mat, 'PEN'))}</td>
-                    </tr>
-                  ))}
+                  <AnimatePresence initial={false}>
+                    {expandedClients[grupo.cliente] && grupo.materiales.map((mat) => (
+                      <motion.tr
+                        key={`${grupo.cliente}-${mat.label}`}
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      >
+                        <td className="material-cell">{mat.label}</td>
+                        <td>{fmtNum(mat?.data?.general?.tne)} TN</td>
+                        <td>${fmtNum(getImporteByDivisa(mat, 'USD'))}</td>
+                        <td>S/{fmtNum(getImporteByDivisa(mat, 'PEN'))}</td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
                 </Fragment>
               ))}
 

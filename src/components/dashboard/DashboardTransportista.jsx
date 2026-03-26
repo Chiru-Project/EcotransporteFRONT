@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { Fragment, useState, useEffect, useRef } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { dashboardService } from '../../services/api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -27,6 +28,8 @@ const DashboardTransportista = () => {
   const [tnPorCliente, setTnPorCliente] = useState([]);
   const [trasladosPorUnidad, setTrasladosPorUnidad] = useState([]);
   const [detalleTransportista, setDetalleTransportista] = useState([]);
+  const [detalleTransportistaViajes, setDetalleTransportistaViajes] = useState([]);
+  const [expandedTransportistas, setExpandedTransportistas] = useState({});
   const [loading, setLoading] = useState(true);
   const [filtersLoading, setFiltersLoading] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -354,21 +357,51 @@ const DashboardTransportista = () => {
     setLoading(true);
     try {
       const activeFilters = getActiveFilters();
-      const [unidad, cliente, traslados, detalle] = await Promise.all([
+      const [unidad, cliente, traslados, detalle, detalleViajes] = await Promise.all([
         dashboardService.getTnPorUnidad(activeFilters),
         dashboardService.getTnPorCliente(activeFilters),
         dashboardService.getTrasladosPorUnidad(activeFilters),
         dashboardService.getDetalleTransportista(activeFilters),
+        dashboardService.getDetalleTransportistaViajes(activeFilters),
       ]);
       setTnPorUnidad((unidad || []).map(item => ({ ...item, total: parseFloat(item.total) || 0 })));
       setTnPorCliente((cliente || []).map(item => ({ ...item, total: parseFloat(item.total) || 0 })));
       setTrasladosPorUnidad((traslados || []).map(item => ({ ...item, cantidad: parseInt(item.cantidad) || 0, tn_recibido: parseFloat(item.tn_recibido) || 0 })));
       setDetalleTransportista(detalle || []);
+      setDetalleTransportistaViajes(detalleViajes || []);
+      setExpandedTransportistas({});
     } catch (error) {
       console.error('Error cargando datos de transportista:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (d) => {
+    if (!d) return '-';
+    const dateStr = typeof d === 'string' ? d.substring(0, 10) : new Date(d).toISOString().substring(0, 10);
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  const makeDetalleKey = (transportista, divisa) => `${transportista || 'Sin asignar'}|${divisa || 'PEN'}`;
+
+  const toggleTransportista = (key) => {
+    setExpandedTransportistas((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getViajesForItem = (item) => {
+    const transportista = item.transportista || '';
+    const divisa = item.divisa_cost || 'PEN';
+    return (detalleTransportistaViajes || []).filter((v) => (v.transportista || '') === transportista && (v.divisa_cost || 'PEN') === divisa);
+  };
+
+  const getRecorridoLabel = (viaje) => {
+    if (viaje.recorrido) return viaje.recorrido;
+    const partida = (viaje.partida || '').split('-').pop()?.trim() || '';
+    const llegada = (viaje.llegada || '').split('-').pop()?.trim() || '';
+    if (!partida && !llegada) return '-';
+    return `${partida}-${llegada}`;
   };
 
   if (loading) {
@@ -455,15 +488,82 @@ const DashboardTransportista = () => {
               <tbody>
                 {[...detalleTransportista]
                   .filter(item => !divisaFiltro || (item.divisa_cost || 'PEN') === divisaFiltro)
-                  .sort((a, b) => (parseInt(b.cantidad_traslados) || 0) - (parseInt(a.cantidad_traslados) || 0)).map((item, index) => (
-                  <tr key={index}>
-                    <td>{item.transportista || 'Sin asignar'}</td>
-                    <td>{item.cantidad_traslados}</td>
-                    <td>{fmtNum(item.tn_recibido)}</td>
-                    <td>{(item.divisa_cost || 'PEN')}</td>
-                    <td>{(item.divisa_cost || 'PEN') === 'USD' ? '$' : 'S/'} {(parseFloat(item.precio_total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  </tr>
-                ))}
+                  .sort((a, b) => (parseInt(b.cantidad_traslados) || 0) - (parseInt(a.cantidad_traslados) || 0)).map((item) => {
+                    const rowKey = makeDetalleKey(item.transportista, item.divisa_cost);
+                    const isExpanded = !!expandedTransportistas[rowKey];
+                    const viajes = isExpanded ? getViajesForItem(item) : [];
+                    return (
+                      <Fragment key={rowKey}>
+                        <tr key={`sum-${rowKey}`} className="fila-transportista-resumen" onClick={() => toggleTransportista(rowKey)}>
+                          <td>
+                            <button className="btn-toggle-transportista" type="button" aria-label={`Expandir ${item.transportista || 'Sin asignar'}`}>
+                              {isExpanded ? '▼' : '▶'}
+                            </button>
+                            <span className="cliente-name">{item.transportista || 'Sin asignar'}</span>
+                          </td>
+                          <td>{item.cantidad_traslados}</td>
+                          <td>{fmtNum(item.tn_recibido)}</td>
+                          <td>{(item.divisa_cost || 'PEN')}</td>
+                          <td>{(item.divisa_cost || 'PEN') === 'USD' ? '$' : 'S/'} {(parseFloat(item.precio_total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        </tr>
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <tr key={`det-${rowKey}`} className="fila-transportista-detalle">
+                              <td colSpan={5}>
+                                <motion.div
+                                  className="transportista-curtain-content"
+                                  initial={{ height: 0, opacity: 0, y: -6 }}
+                                  animate={{ height: 'auto', opacity: 1, y: 0 }}
+                                  exit={{ height: 0, opacity: 0, y: -6 }}
+                                  transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                                >
+                                <div className="transportista-curtain-meta">
+                                  <strong>{item.transportista || 'Sin asignar'}</strong> | {item.cantidad_traslados} traslados | {fmtNum(item.tn_recibido)} TN | {(item.divisa_cost || 'PEN') === 'USD' ? '$' : 'S/'} {(parseFloat(item.precio_total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                                {viajes.length === 0 ? (
+                                  <div className="transportista-empty-detail">No hay detalle de traslados para este transportista.</div>
+                                ) : (
+                                  <div className="transportista-curtain-wrap">
+                                    <table className="transportista-curtain-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Fecha</th>
+                                          <th>Placa</th>
+                                          <th>Cliente</th>
+                                          <th>Recorrido</th>
+                                          <th>Material</th>
+                                          <th>Guía</th>
+                                          <th>Ticket</th>
+                                          <th>TN Recibida</th>
+                                          <th>Precio</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {viajes.map((v, i) => (
+                                          <tr key={`${rowKey}-v-${i}`}>
+                                            <td>{formatDate(v.fecha)}</td>
+                                            <td>{v.unidad || '-'}</td>
+                                            <td>{v.cliente || '-'}</td>
+                                            <td>{getRecorridoLabel(v)}</td>
+                                            <td>{v.material || '-'}</td>
+                                            <td>{v.grt || '-'}</td>
+                                            <td>{v.ticket || '-'}</td>
+                                            <td>{fmtNum(v.tn_recibida)} TN</td>
+                                            <td>{(item.divisa_cost || 'PEN') === 'USD' ? '$' : 'S/'} {(parseFloat(v.precio_total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                                </motion.div>
+                              </td>
+                            </tr>
+                          )}
+                        </AnimatePresence>
+                      </Fragment>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

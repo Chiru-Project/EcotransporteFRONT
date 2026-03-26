@@ -557,6 +557,83 @@
   font-weight: 700;
 }
 
+.fila-transportista-resumen {
+  cursor: pointer;
+}
+
+.fila-transportista-resumen td {
+  background: #f8fafc;
+  font-weight: 600;
+}
+
+.btn-toggle-transportista {
+  border: none;
+  background: transparent;
+  color: #1e2a3a;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 0.45rem;
+  padding: 0;
+}
+
+.fila-transportista-detalle td {
+  background: #ffffff;
+  padding: 0;
+}
+
+.transportista-curtain-content {
+  overflow: hidden;
+  padding: 0.65rem 0.75rem;
+}
+
+.transportista-curtain-meta {
+  font-size: 0.84rem;
+  color: #1f2937;
+  margin-bottom: 0.5rem;
+}
+
+.transportista-curtain-wrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.transportista-curtain-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 860px;
+}
+
+.transportista-curtain-table th,
+.transportista-curtain-table td {
+  border: 1px solid #e2e8f0;
+  padding: 0.42rem 0.5rem;
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.transportista-curtain-table th {
+  background: #e8f5e9;
+  color: #1e3d2c;
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.transportista-curtain-table td:nth-last-child(-n+2),
+.transportista-curtain-table th:nth-last-child(-n+2) {
+  text-align: right;
+}
+
+.transportista-empty-detail {
+  font-size: 0.82rem;
+  color: #64748b;
+  padding: 0.35rem 0;
+}
+
 .sub-tabs {
   display: flex;
   gap: 0.5rem;

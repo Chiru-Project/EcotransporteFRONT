@@ -1,8 +1,9 @@
 import { Fragment, useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
-import XLSX from 'xlsx-js-style';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { dashboardService } from '../../services/api';
+import logoEmpresa from '../../assets/Images/logo-empresa.png';
+import logoEmpresaInline from '../../assets/Images/logo-empresa.png?inline';
 import './TablasDetalladasModal.css';
 
 const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
@@ -92,6 +93,13 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
 
   const [exportingPdf, setExportingPdf] = useState(false);
 
+  const toBase64 = (blob) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+
   const handleDownloadPDF = async () => {
     const content = printRef.current;
     if (!content) return;
@@ -143,145 +151,333 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
     }
   };
 
-  const handleDownloadExcel = () => {
+  const handleDownloadExcel = async () => {
     if (!data) return;
-    const empresas = empresaFiltro
-      ? data.empresas.filter(e => e === empresaFiltro)
-      : data.empresas;
-    const semanaLabel = semana ? `Semana ${semana}` : 'Todo el mes';
-    const titulo = `Reporte Detallado — ${mes.toUpperCase()}${semana ? ` · Semana ${semana}` : ''}`;
+    try {
+      const { default: ExcelJS } = await import('exceljs');
+      const empresas = empresaFiltro
+        ? data.empresas.filter(e => e === empresaFiltro)
+        : data.empresas;
+      const semanaLabel = semana ? `Semana ${semana}` : 'Todo el mes';
+      const mesLabel = mes || 'general';
+      const titulo = `ECOTRANSPORTE - REPORTE DETALLADO (${mesLabel.toUpperCase()})`;
 
-    const border = { border: { top: { style: 'thin', color: { rgb: 'E2E8F0' } }, bottom: { style: 'thin', color: { rgb: 'E2E8F0' } }, left: { style: 'thin', color: { rgb: 'E2E8F0' } }, right: { style: 'thin', color: { rgb: 'E2E8F0' } } } };
-    const titleStyle = { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1E3D2C' } }, alignment: { horizontal: 'center' } };
-    const infoStyle = { font: { bold: true, sz: 10, color: { rgb: '333333' } } };
-    const hCliente = { font: { bold: true, sz: 9, color: { rgb: '173324' } }, fill: { fgColor: { rgb: '96D9B8' } }, alignment: { horizontal: 'left', wrapText: true }, ...border };
-    const hGeneral = { font: { bold: true, sz: 9, color: { rgb: '1E2F5C' } }, fill: { fgColor: { rgb: 'A3BFFA' } }, alignment: { horizontal: 'center', wrapText: true }, ...border };
-    const empColors = ['C4A8F0', 'FAC98A', 'F5A3A8', 'A8C8DC'];
-    const empFonts = ['2E2048', '3D2200', '3D1018', '1A3040'];
-    const cellLeft = { ...border, font: { sz: 9 }, alignment: { horizontal: 'left' } };
-    const cellRight = { ...border, font: { sz: 9 }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00' };
-    const clienteRowStyle = { font: { bold: true, sz: 10, color: { rgb: '1E2A3A' } }, fill: { fgColor: { rgb: 'C5D0E0' } }, alignment: { horizontal: 'left' }, ...border };
-    const materialStyle = { font: { sz: 9 }, alignment: { horizontal: 'left' }, ...border };
-    const totalRowStyle = { font: { bold: true, sz: 10, color: { rgb: '1E3D2C' } }, fill: { fgColor: { rgb: 'A8DBC0' } }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', ...border };
-    const totalLabelStyle = { ...totalRowStyle, alignment: { horizontal: 'left' } };
-    const white = { font: { sz: 9 } };
+      const workbook = new ExcelJS.Workbook();
 
-    const buildSheet = (type) => {
-      const colCount = 3 + empresas.length * 2;
-      const rows = [];
+      const isZeroLike = (value) => Math.abs(Number(value) || 0) < 0.000001;
+      const formatNumber = (value) => (Number(value) || 0).toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const formatTn = (value) => (isZeroLike(value) ? '-' : `${formatNumber(value)} TN`);
+      const formatMoney = (value, currencySymbol) => (isZeroLike(value) ? '-' : `${currencySymbol}${formatNumber(value)}`);
 
-      // Título
-      const titleRow = Array(colCount).fill({ v: '', s: titleStyle });
-      titleRow[0] = { v: titulo, s: titleStyle };
-      rows.push(titleRow);
+      let logoImageId = null;
+      try {
+        let logoDataUrl = '';
+        let logoExtension = 'png';
 
-      // Info
-      const info = Array(colCount).fill({ v: '', s: white });
-      info[0] = { v: `Mes: ${mes}`, s: infoStyle };
-      info[1] = { v: `${semanaLabel}`, s: infoStyle };
-      info[2] = { v: `Empresa: ${empresaFiltro || 'Todas'}`, s: infoStyle };
-      rows.push(info);
-      rows.push(Array(colCount).fill({ v: '', s: white }));
+        // Primary path: inline asset (DataURL) avoids URL/CORS/path issues.
+        if (typeof logoEmpresaInline === 'string' && logoEmpresaInline.startsWith('data:image/')) {
+          logoDataUrl = logoEmpresaInline;
+          logoExtension = logoEmpresaInline.includes('image/jpeg') ? 'jpeg' : 'png';
+        }
 
-      // Headers
-      const header = [];
-      header.push({ v: 'Cliente / Material', s: hCliente });
-      header.push({ v: 'General TNE', s: hGeneral });
-      header.push({ v: 'General Importe', s: hGeneral });
-      empresas.forEach((emp, i) => {
-        const empStyle = { font: { bold: true, sz: 9, color: { rgb: empFonts[i % empFonts.length] } }, fill: { fgColor: { rgb: empColors[i % empColors.length] } }, alignment: { horizontal: 'center', wrapText: true }, ...border };
-        header.push({ v: `${emp} TNE`, s: empStyle });
-        header.push({ v: `${emp} Importe`, s: empStyle });
-      });
-      rows.push(header);
+        // Fallbacks: match working fetch pattern from Documents.
+        if (!logoDataUrl) {
+          const logoSources = [
+            logoEmpresa,
+            '/src/assets/Images/logo-empresa.png',
+            'http://localhost:5173/src/assets/Images/logo-empresa.png',
+          ];
 
-      // Data
-      for (const grupo of data.grupos) {
-        const cRow = Array(colCount).fill({ v: '', s: clienteRowStyle });
-        cRow[0] = { v: `▶ ${grupo.cliente}`, s: clienteRowStyle };
-        rows.push(cRow);
-
-        for (const mat of grupo.materiales) {
-          const row = [];
-          row.push({ v: `  ${mat.label}`, s: materialStyle });
-          row.push({ v: Math.round((Number(mat.data.general.tne) || 0) * 100) / 100, t: 'n', s: cellRight });
-          row.push({ v: Math.round((Number(type === 'venta' ? mat.data.general.importeVenta : mat.data.general.importeCosto) || 0) * 100) / 100, t: 'n', s: cellRight });
-          for (const emp of empresas) {
-            const d = mat.data[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
-            row.push({ v: Math.round((Number(d.tne) || 0) * 100) / 100, t: 'n', s: cellRight });
-            row.push({ v: Math.round((Number(type === 'venta' ? d.importeVenta : d.importeCosto) || 0) * 100) / 100, t: 'n', s: cellRight });
+          for (const source of logoSources) {
+            try {
+              const logoResponse = await fetch(source, { cache: 'no-store' });
+              if (!logoResponse.ok) continue;
+              const logoBlob = await logoResponse.blob();
+              const dataUrl = await toBase64(logoBlob);
+              if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+                logoDataUrl = dataUrl;
+                logoExtension = dataUrl.includes('image/jpeg') ? 'jpeg' : 'png';
+                break;
+              }
+            } catch {
+              // Keep trying remaining sources.
+            }
           }
-          rows.push(row);
         }
+
+        if (logoDataUrl) {
+          logoImageId = workbook.addImage({
+            base64: logoDataUrl,
+            extension: logoExtension,
+          });
+        } else {
+          console.warn('No se pudo cargar logo para Excel (Tablas Detalladas).');
+        }
+      } catch (logoError) {
+        console.warn('No se pudo insertar el logo en Excel de Tablas Detalladas:', logoError);
       }
 
-      // Totales
-      for (const [div, label] of [['USD', 'Total Dólares (USD)'], ['PEN', 'Total Soles (PEN)']]) {
-        const tot = data.totales[div];
-        const row = [];
-        row.push({ v: label, s: totalLabelStyle });
-        row.push({ v: Math.round((Number(tot.general.tne) || 0) * 100) / 100, t: 'n', s: totalRowStyle });
-        row.push({ v: Math.round((Number(type === 'venta' ? tot.general.importeVenta : tot.general.importeCosto) || 0) * 100) / 100, t: 'n', s: totalRowStyle });
-        for (const emp of empresas) {
-          const d = tot[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
-          row.push({ v: Math.round((Number(d.tne) || 0) * 100) / 100, t: 'n', s: totalRowStyle });
-          row.push({ v: Math.round((Number(type === 'venta' ? d.importeVenta : d.importeCosto) || 0) * 100) / 100, t: 'n', s: totalRowStyle });
+      const placeLogo = (worksheet) => {
+        if (!logoImageId) return;
+        worksheet.addImage(logoImageId, {
+          tl: { col: 0.08, row: 0.12 },
+          ext: { width: 128, height: 52 },
+          editAs: 'oneCell',
+        });
+      };
+
+      const applySheetLayout = (worksheet, colCount, subtitle) => {
+        worksheet.views = [{ state: 'frozen', ySplit: 6 }];
+        worksheet.mergeCells(1, 1, 2, 1);
+        worksheet.mergeCells(1, 3, 1, colCount);
+        worksheet.mergeCells(2, 3, 2, colCount);
+        worksheet.mergeCells(4, 1, 4, colCount);
+
+        worksheet.getCell(1, 3).value = titulo;
+        worksheet.getCell(1, 3).font = { bold: true, size: 15, color: { argb: 'FF1B7430' } };
+        worksheet.getCell(1, 3).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+        worksheet.getCell(2, 3).value = `Generado: ${new Date().toLocaleString('es-PE')}`;
+        worksheet.getCell(2, 3).font = { size: 10, color: { argb: 'FF4B5563' } };
+        worksheet.getCell(2, 3).alignment = { vertical: 'middle', horizontal: 'left' };
+
+        worksheet.getCell(4, 1).value = `Tipo: ${subtitle} | Mes: ${mesLabel} | ${semanaLabel} | Empresa: ${empresaFiltro || 'Todas'}`;
+        worksheet.getCell(4, 1).font = { bold: true, size: 10, color: { argb: 'FF374151' } };
+        worksheet.getCell(4, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5F4E7' } };
+        worksheet.getCell(4, 1).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+        worksheet.getRow(1).height = 34;
+        worksheet.getRow(2).height = 22;
+        worksheet.getRow(4).height = 22;
+      };
+
+      const styleHeaderRow = (row, empresasCount) => {
+        const totalCols = 3 + empresasCount * 2;
+        for (let col = 1; col <= totalCols; col++) {
+          const cell = row.getCell(col);
+          let fill = { argb: 'FFA3BFFA' };
+          let fontColor = { argb: 'FF1E2F5C' };
+
+          if (col === 1) {
+            fill = { argb: 'FF96D9B8' };
+            fontColor = { argb: 'FF173324' };
+          } else if (col >= 4) {
+            const companyIndex = Math.floor((col - 4) / 2) % 4;
+            const palette = [
+              { fill: { argb: 'FFC4A8F0' }, font: { argb: 'FF2E2048' } },
+              { fill: { argb: 'FFFAC98A' }, font: { argb: 'FF3D2200' } },
+              { fill: { argb: 'FFF5A3A8' }, font: { argb: 'FF3D1018' } },
+              { fill: { argb: 'FFA8C8DC' }, font: { argb: 'FF1A3040' } },
+            ][companyIndex];
+            fill = palette.fill;
+            fontColor = palette.font;
+          }
+
+          cell.font = { bold: true, size: 10, color: fontColor };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: fill };
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          };
         }
-        rows.push(row);
-      }
+      };
 
-      const ws = XLSX.utils.aoa_to_sheet(rows);
-      // Anchos
-      const cols = [{ wch: 30 }, { wch: 14 }, { wch: 14 }];
-      empresas.forEach(() => { cols.push({ wch: 14 }, { wch: 14 }); });
-      ws['!cols'] = cols;
-      ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } }];
-      return ws;
-    };
+      const styleDataRow = (row, totalCols, options = {}) => {
+        row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+          cell.alignment = { vertical: 'middle', horizontal: colNumber === 1 ? 'left' : 'right' };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          cell.font = { size: 9, color: { argb: 'FF1E2A3A' }, bold: !!options.bold };
+          if (options.fill) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: options.fill } };
+          }
+        });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, buildSheet('venta'), 'Venta');
-    XLSX.utils.book_append_sheet(wb, buildSheet('costo'), 'Costo');
+        for (let col = row.cellCount + 1; col <= totalCols; col++) {
+          const cell = row.getCell(col);
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          if (options.fill) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: options.fill } };
+          }
+        }
+      };
 
-    // Hoja Margen
-    const colCount = 2 + empresas.length;
-    const margenRows = [];
-    const mTitleRow = Array(colCount).fill({ v: '', s: titleStyle });
-    mTitleRow[0] = { v: titulo, s: titleStyle };
-    margenRows.push(mTitleRow);
+      const buildVentaCostoSheet = (sheetName, type) => {
+        const colCount = 3 + empresas.length * 2;
+        const worksheet = workbook.addWorksheet(sheetName);
+        applySheetLayout(worksheet, colCount, sheetName);
 
-    const mInfo = Array(colCount).fill({ v: '', s: white });
-    mInfo[0] = { v: `Mes: ${mes}`, s: infoStyle };
-    mInfo[1] = { v: `${semanaLabel}`, s: infoStyle };
-    margenRows.push(mInfo);
-    margenRows.push(Array(colCount).fill({ v: '', s: white }));
+        worksheet.columns = [
+          { key: 'cliente', width: 34 },
+          { key: 'generalTne', width: 16 },
+          { key: 'generalImporte', width: 18 },
+          ...empresas.flatMap(() => [{ width: 16 }, { width: 18 }]),
+        ];
+        placeLogo(worksheet);
 
-    const mLabel = Array(colCount).fill({ v: '', s: { font: { bold: true, sz: 12, color: { rgb: '1E3D2C' } } } });
-    mLabel[0] = { v: 'Margen de Ganancia', s: mLabel[0].s };
-    margenRows.push(mLabel);
+        const headerRow = worksheet.getRow(6);
+        const headerValues = ['Cliente / Material', 'General TNE', 'General Importe'];
+        empresas.forEach((emp) => {
+          headerValues.push(`${formatEmpresa(emp)} TNE`);
+          headerValues.push(`${formatEmpresa(emp)} Importe`);
+        });
+        headerRow.values = headerValues;
+        headerRow.height = 26;
+        styleHeaderRow(headerRow, empresas.length);
 
-    const mHeader = [{ v: 'Concepto', s: hCliente }, { v: 'General', s: hGeneral }];
-    empresas.forEach((emp, i) => {
-      const empStyle = { font: { bold: true, sz: 9, color: { rgb: empFonts[i % empFonts.length] } }, fill: { fgColor: { rgb: empColors[i % empColors.length] } }, alignment: { horizontal: 'center', wrapText: true }, ...border };
-      mHeader.push({ v: emp, s: empStyle });
-    });
-    margenRows.push(mHeader);
+        for (const grupo of data.grupos) {
+          const clienteRow = worksheet.addRow([grupo.cliente]);
+          clienteRow.eachCell({ includeEmpty: true }, (cell) => {
+            cell.font = { bold: true, size: 10, color: { argb: 'FF1E2A3A' } };
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC5D0E0' } };
+            cell.alignment = { vertical: 'middle', horizontal: 'left' };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'FFB0BCD0' } },
+              left: { style: 'thin', color: { argb: 'FFB0BCD0' } },
+              bottom: { style: 'thin', color: { argb: 'FFB0BCD0' } },
+              right: { style: 'thin', color: { argb: 'FFB0BCD0' } },
+            };
+          });
+          worksheet.mergeCells(clienteRow.number, 1, clienteRow.number, colCount);
 
-    for (const [div, label] of [['USD', 'Dólares (USD)'], ['PEN', 'Soles (PEN)']]) {
-      const row = [{ v: label, s: totalLabelStyle }, { v: Math.round((Number(data.margen[div].general.margen) || 0) * 100) / 100, t: 'n', s: totalRowStyle }];
-      for (const emp of empresas) row.push({ v: Math.round((Number((data.margen[div][emp] || { margen: 0 }).margen) || 0) * 100) / 100, t: 'n', s: totalRowStyle });
-      margenRows.push(row);
+          for (const mat of grupo.materiales) {
+            const currency = mat.divisa === 'PEN' ? 'S/' : '$';
+            const rowValues = [
+              mat.label,
+              formatTn(mat.data.general.tne),
+              formatMoney(type === 'venta' ? mat.data.general.importeVenta : mat.data.general.importeCosto, currency),
+            ];
+
+            for (const emp of empresas) {
+              const d = mat.data[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
+              rowValues.push(formatTn(d.tne));
+              rowValues.push(formatMoney(type === 'venta' ? d.importeVenta : d.importeCosto, currency));
+            }
+
+            const row = worksheet.addRow(rowValues);
+            styleDataRow(row, colCount);
+          }
+        }
+
+        const totalsConfig = [
+          { div: 'USD', label: 'Total Dolares (USD)', symbol: '$' },
+          { div: 'PEN', label: 'Total Soles (PEN)', symbol: 'S/' },
+        ];
+
+        totalsConfig.forEach(({ div, label, symbol }) => {
+          const tot = data.totales[div];
+          const rowValues = [
+            label,
+            formatTn(tot.general.tne),
+            formatMoney(type === 'venta' ? tot.general.importeVenta : tot.general.importeCosto, symbol),
+          ];
+
+          for (const emp of empresas) {
+            const d = tot[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
+            rowValues.push(formatTn(d.tne));
+            rowValues.push(formatMoney(type === 'venta' ? d.importeVenta : d.importeCosto, symbol));
+          }
+
+          const totalRow = worksheet.addRow(rowValues);
+          styleDataRow(totalRow, colCount, { bold: true, fill: 'FFA8DBC0' });
+        });
+
+        worksheet.autoFilter = {
+          from: { row: 6, column: 1 },
+          to: { row: 6, column: colCount },
+        };
+      };
+
+      const buildMargenSheet = () => {
+        const colCount = 2 + empresas.length;
+        const worksheet = workbook.addWorksheet('Margen');
+        applySheetLayout(worksheet, colCount, 'Margen de Ganancia');
+
+        worksheet.columns = [
+          { key: 'concepto', width: 28 },
+          { key: 'general', width: 20 },
+          ...empresas.map(() => ({ width: 20 })),
+        ];
+        placeLogo(worksheet);
+
+        const headerRow = worksheet.getRow(6);
+        const headerValues = ['Concepto', 'General'];
+        empresas.forEach((emp) => headerValues.push(formatEmpresa(emp)));
+        headerRow.values = headerValues;
+        headerRow.height = 26;
+
+        for (let col = 1; col <= colCount; col++) {
+          const cell = headerRow.getCell(col);
+          if (col === 1) {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF96D9B8' } };
+            cell.font = { bold: true, size: 10, color: { argb: 'FF173324' } };
+          } else {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFA3BFFA' } };
+            cell.font = { bold: true, size: 10, color: { argb: 'FF1E2F5C' } };
+          }
+          cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          };
+        }
+
+        const marginRows = [
+          { div: 'USD', label: 'Dolares (USD)', symbol: '$' },
+          { div: 'PEN', label: 'Soles (PEN)', symbol: 'S/' },
+        ];
+
+        marginRows.forEach(({ div, label, symbol }) => {
+          const rowValues = [label, formatMoney(data.margen[div].general.margen, symbol)];
+          for (const emp of empresas) {
+            const marginValue = (data.margen[div][emp] || { margen: 0 }).margen;
+            rowValues.push(formatMoney(marginValue, symbol));
+          }
+
+          const row = worksheet.addRow(rowValues);
+          styleDataRow(row, colCount, { bold: true });
+        });
+
+        worksheet.autoFilter = {
+          from: { row: 6, column: 1 },
+          to: { row: 6, column: colCount },
+        };
+      };
+
+      buildVentaCostoSheet('Venta', 'venta');
+      buildVentaCostoSheet('Costo', 'costo');
+      buildMargenSheet();
+
+      const fileName = `tablas_detalladas_${mesLabel.toUpperCase()}${semana ? `_sem${semana}` : ''}${empresaFiltro ? `_${empresaFiltro.replace(/\s+/g, '_')}` : ''}.xlsx`;
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exportando tablas detalladas a Excel:', error);
     }
-
-    const margenWs = XLSX.utils.aoa_to_sheet(margenRows);
-    const mCols = [{ wch: 25 }, { wch: 14 }];
-    empresas.forEach(() => mCols.push({ wch: 14 }));
-    margenWs['!cols'] = mCols;
-    margenWs['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } }];
-    XLSX.utils.book_append_sheet(wb, margenWs, 'Margen');
-
-    const fileName = `Tablas_Detalladas_${mes.toUpperCase()}${semana ? `_Sem${semana}` : ''}${empresaFiltro ? `_${empresaFiltro.replace(/\s+/g, '_')}` : ''}.xlsx`;
-    XLSX.writeFile(wb, fileName);
   };
 
   if (!isOpen) return null;
@@ -290,6 +486,17 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
     const val = Number(n) || 0;
     return val.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  const isZeroLike = (n) => {
+    const val = Number(n) || 0;
+    return Math.abs(val) < 0.000001;
+  };
+
+  const formatTnDisplay = (n) => (isZeroLike(n) ? '-' : `${formatNum(n)} TN`);
+
+  const formatMoneyDisplay = (n, currencySymbol) => (
+    isZeroLike(n) ? '-' : `${currencySymbol}${formatNum(n)}`
+  );
 
   const formatEmpresa = (empresa) => {
     if (!empresa || empresa === 'SIN EMPRESA') return empresa || 'SIN EMPRESA';
@@ -337,13 +544,13 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
                   {grupo.materiales.map((mat, mIdx) => (
                     <tr key={`mat-${gIdx}-${mIdx}`}>
                       <td className="col-cliente col-material">{mat.label}</td>
-                      <td>{formatNum(mat.data.general.tne)} TN</td>
-                      <td>{mat.divisa === 'PEN' ? 'S/' : '$'}{formatNum(type === 'venta' ? mat.data.general.importeVenta : mat.data.general.importeCosto)}</td>
+                      <td>{formatTnDisplay(mat.data.general.tne)}</td>
+                      <td>{formatMoneyDisplay(type === 'venta' ? mat.data.general.importeVenta : mat.data.general.importeCosto, mat.divisa === 'PEN' ? 'S/' : '$')}</td>
                       {empresas.map(emp => {
                         const d = mat.data[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
                         return [
-                          <td key={`${emp}-${gIdx}-${mIdx}-tne`}>{formatNum(d.tne)} TN</td>,
-                          <td key={`${emp}-${gIdx}-${mIdx}-imp`}>{mat.divisa === 'PEN' ? 'S/' : '$'}{formatNum(type === 'venta' ? d.importeVenta : d.importeCosto)}</td>,
+                          <td key={`${emp}-${gIdx}-${mIdx}-tne`}>{formatTnDisplay(d.tne)}</td>,
+                          <td key={`${emp}-${gIdx}-${mIdx}-imp`}>{formatMoneyDisplay(type === 'venta' ? d.importeVenta : d.importeCosto, mat.divisa === 'PEN' ? 'S/' : '$')}</td>,
                         ];
                       })}
                     </tr>
@@ -353,26 +560,26 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
               {/* Total Dólares */}
               <tr className="fila-total">
                 <td className="col-cliente">Total Dólares (USD)</td>
-                <td>{formatNum(totales.USD.general.tne)} TN</td>
-                <td>${formatNum(type === 'venta' ? totales.USD.general.importeVenta : totales.USD.general.importeCosto)}</td>
+                <td>{formatTnDisplay(totales.USD.general.tne)}</td>
+                <td>{formatMoneyDisplay(type === 'venta' ? totales.USD.general.importeVenta : totales.USD.general.importeCosto, '$')}</td>
                 {empresas.map(emp => {
                   const d = totales.USD[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
                   return [
-                    <td key={`usd-${emp}-tne`}>{formatNum(d.tne)} TN</td>,
-                    <td key={`usd-${emp}-imp`}>${formatNum(type === 'venta' ? d.importeVenta : d.importeCosto)}</td>,
+                    <td key={`usd-${emp}-tne`}>{formatTnDisplay(d.tne)}</td>,
+                    <td key={`usd-${emp}-imp`}>{formatMoneyDisplay(type === 'venta' ? d.importeVenta : d.importeCosto, '$')}</td>,
                   ];
                 })}
               </tr>
               {/* Total Soles */}
               <tr className="fila-total">
                 <td className="col-cliente">Total Soles (PEN)</td>
-                <td>{formatNum(totales.PEN.general.tne)} TN</td>
-                <td>S/{formatNum(type === 'venta' ? totales.PEN.general.importeVenta : totales.PEN.general.importeCosto)}</td>
+                <td>{formatTnDisplay(totales.PEN.general.tne)}</td>
+                <td>{formatMoneyDisplay(type === 'venta' ? totales.PEN.general.importeVenta : totales.PEN.general.importeCosto, 'S/')}</td>
                 {empresas.map(emp => {
                   const d = totales.PEN[emp] || { tne: 0, importeVenta: 0, importeCosto: 0 };
                   return [
-                    <td key={`pen-${emp}-tne`}>{formatNum(d.tne)} TN</td>,
-                    <td key={`pen-${emp}-imp`}>S/{formatNum(type === 'venta' ? d.importeVenta : d.importeCosto)}</td>,
+                    <td key={`pen-${emp}-tne`}>{formatTnDisplay(d.tne)}</td>,
+                    <td key={`pen-${emp}-imp`}>{formatMoneyDisplay(type === 'venta' ? d.importeVenta : d.importeCosto, 'S/')}</td>,
                   ];
                 })}
               </tr>
@@ -413,16 +620,16 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
             <tbody>
               <tr>
                 <td className="col-cliente">Dólares (USD)</td>
-                <td colSpan={2}>${formatNum(margen.USD.general.margen)}</td>
+                <td colSpan={2}>{formatMoneyDisplay(margen.USD.general.margen, '$')}</td>
                 {empresas.map(emp => (
-                  <td key={`usd-${emp}`} colSpan={2}>${formatNum((margen.USD[emp] || { margen: 0 }).margen)}</td>
+                  <td key={`usd-${emp}`} colSpan={2}>{formatMoneyDisplay((margen.USD[emp] || { margen: 0 }).margen, '$')}</td>
                 ))}
               </tr>
               <tr>
                 <td className="col-cliente">Soles (PEN)</td>
-                <td colSpan={2}>S/{formatNum(margen.PEN.general.margen)}</td>
+                <td colSpan={2}>{formatMoneyDisplay(margen.PEN.general.margen, 'S/')}</td>
                 {empresas.map(emp => (
-                  <td key={`pen-${emp}`} colSpan={2}>S/{formatNum((margen.PEN[emp] || { margen: 0 }).margen)}</td>
+                  <td key={`pen-${emp}`} colSpan={2}>{formatMoneyDisplay((margen.PEN[emp] || { margen: 0 }).margen, 'S/')}</td>
                 ))}
               </tr>
             </tbody>
@@ -488,7 +695,7 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
             <div className="empty-section">Selecciona un mes para ver los datos</div>
           ) : (
             <>
-              <div ref={printRef}>
+              <div ref={printRef} className="tablas-print-wrap">
                 <h3 style={{ textAlign: 'center', marginBottom: 14, fontSize: '1.1rem', fontWeight: 700, color: '#1a2332', letterSpacing: '0.02em' }}>
                   Reporte Detallado — <span style={{ textTransform: 'uppercase', color: '#2D8F4E', fontWeight: 800 }}>{mes}</span>
                   {semana && <span style={{ color: '#1a6fa8', fontWeight: 700 }}> · Semana {semana}</span>}

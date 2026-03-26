@@ -486,6 +486,15 @@ export const dashboardService = {
     return handleResponse(response);
   },
 
+  // Detalle de traslados por transportista (para cortina desplegable)
+  getDetalleTransportistaViajes: async (filters = {}) => {
+    const params = new URLSearchParams(filters).toString();
+    const response = await fetch(`${API_URL}/dashboard/detalle-transportista-viajes?${params}`, {
+      headers: authHeaders()
+    });
+    return handleResponse(response);
+  },
+
   // Tonelaje enviado general
   getTonelajeEnviadoGeneral: async () => {
     const response = await fetch(`${API_URL}/dashboard/tonelaje-enviado-general`, {
