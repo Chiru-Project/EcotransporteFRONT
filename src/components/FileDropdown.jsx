@@ -79,6 +79,9 @@ const FileDropdown = ({ document, onUpdate }) => {
     window.open(proxyUrl, '_blank');
   };
 
+  const getProxyUrl = (idx) => `${API_URL}/documents/${document.id}/files/${idx}`;
+  const isPdfUrl = (url) => /\.pdf($|\?)/i.test(url || '') || /\/raw\/upload\//i.test(url || '');
+
 
   return (
     <div className="file-dropdown">
@@ -92,11 +95,11 @@ const FileDropdown = ({ document, onUpdate }) => {
             onDragOver={onDragOver}
             onDrop={(e) => onDrop(e, idx)}
           >
-            <div className="file-preview" onClick={() => window.open(url, '_blank')}>
-              {url.match(/\.pdf($|\?)/i) ? (
-                <embed src={url} type="application/pdf" width="100%" height="80" />
+            <div className="file-preview" onClick={() => window.open(getProxyUrl(idx), '_blank')}>
+              {isPdfUrl(url) ? (
+                <embed src={getProxyUrl(idx)} type="application/pdf" width="100%" height="80" />
               ) : (
-                <img src={url} alt="preview" />
+                <img src={getProxyUrl(idx)} alt="preview" />
               )}
             </div>
             <div className="file-actions">
