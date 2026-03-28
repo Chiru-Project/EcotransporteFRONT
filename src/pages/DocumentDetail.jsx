@@ -93,6 +93,12 @@ const DocumentDetail = () => {
   }
 
   const esEcotransporte = (document.empresa || '').toUpperCase().includes('ECOTRANSPORTE');
+  const formatAmount = (value) => {
+    if (value === null || value === undefined || value === '') return '-';
+    const n = Number(value);
+    if (Number.isNaN(n)) return String(value);
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   return (
     <div className={`document-detail${document.anulado ? ' anulado' : ''}`}>
@@ -291,23 +297,23 @@ const DocumentDetail = () => {
           <div className="info-grid">
             <div className="info-item">
               <label>Precio Unitario con IGV</label>
-              <span>{document.precio_unitario ? `${document.precio_unitario} ${document.divisa || ''}` : '-'}</span>
+              <span>{document.precio_unitario !== null && document.precio_unitario !== undefined && document.precio_unitario !== '' ? `${formatAmount(document.precio_unitario)} ${document.divisa || ''}` : '-'}</span>
             </div>
             <div className="info-item">
               <label>Precio Final</label>
-              <span>{document.precio_final ? `${document.precio_final} ${document.divisa || ''}` : '-'}</span>
+              <span>{document.precio_final !== null && document.precio_final !== undefined && document.precio_final !== '' ? `${formatAmount(document.precio_final)} ${document.divisa || ''}` : '-'}</span>
             </div>
             <div className="info-item">
               <label>Costo Unitario con IGV</label>
-              <span>{esEcotransporte ? '0' : (document.pcosto ? `${document.pcosto} ${document.divisa_cost || ''}` : '-')}</span>
+              <span>{esEcotransporte ? '0.00' : (document.pcosto !== null && document.pcosto !== undefined && document.pcosto !== '' ? `${formatAmount(document.pcosto)} ${document.divisa_cost || ''}` : '-')}</span>
             </div>
             <div className="info-item">
               <label>Costo Final</label>
-              <span>{esEcotransporte ? '0' : (document.costo_final ? `${document.costo_final} ${document.divisa_cost || ''}` : '-')}</span>
+              <span>{esEcotransporte ? '0.00' : (document.costo_final !== null && document.costo_final !== undefined && document.costo_final !== '' ? `${formatAmount(document.costo_final)} ${document.divisa_cost || ''}` : '-')}</span>
             </div>
             <div className="info-item">
               <label>Margen Operativo</label>
-              <span>{esEcotransporte ? '0' : (document.margen_operativo || '-')}</span>
+              <span>{esEcotransporte ? '0.00' : formatAmount(document.margen_operativo)}</span>
             </div>
           </div>
         </div>

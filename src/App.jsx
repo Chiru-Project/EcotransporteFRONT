@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -17,13 +18,54 @@ import AdminEmpresas from './pages/AdminEmpresas';
 import AdminUnidades from './pages/AdminUnidades';
 import AdminTarifas from './pages/AdminTarifas';
 import ViajesCliente from './pages/ViajesCliente';
+import logoEmpresa from './assets/Images/logo-empresa.png';
 import './App.css';
+
+const APP_NAME = 'ECOTRANSPORTE';
+
+function getPageTitle(pathname) {
+  if (pathname === '/dashboard') return 'Dashboard';
+  if (pathname === '/documents') return 'Documentos';
+  if (/^\/documents\/\d+$/.test(pathname)) return 'Detalle de Documento';
+  if (/^\/documents\/\d+\/edit$/.test(pathname)) return 'Editar Documento';
+  if (pathname === '/manual-register') return 'Agregar Registro';
+  if (pathname === '/upload') return 'Subir PDF';
+  if (pathname === '/admin/empresas') return 'Admin Empresas';
+  if (pathname === '/admin/unidades') return 'Admin Unidades';
+  if (pathname === '/admin/tarifas') return 'Admin Tarifas';
+  if (pathname === '/viajes-cliente') return 'Viajes por Cliente';
+  if (pathname === '/login') return 'Iniciar Sesion';
+  if (pathname === '/signup') return 'Registro';
+  if (pathname === '/forgot-password') return 'Recuperar Contrasena';
+  return APP_NAME;
+}
+
+function RouteMeta() {
+  const location = useLocation();
+
+  useEffect(() => {
+    const pageTitle = getPageTitle(location.pathname);
+    document.title = pageTitle === APP_NAME ? APP_NAME : `${pageTitle} | ${APP_NAME}`;
+
+    let favicon = document.querySelector('link[rel="icon"]');
+    if (!favicon) {
+      favicon = document.createElement('link');
+      favicon.setAttribute('rel', 'icon');
+      document.head.appendChild(favicon);
+    }
+    favicon.setAttribute('type', 'image/png');
+    favicon.setAttribute('href', logoEmpresa);
+  }, [location.pathname]);
+
+  return null;
+}
 
 function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
         <BrowserRouter>
+          <RouteMeta />
           <Toast />
           <Routes>
             {/* Rutas públicas */}

@@ -465,6 +465,8 @@ const DashboardFinanciero = ({ filters }) => {
       .join(' ');
   };
 
+  const upperText = (text) => (text ? String(text).toUpperCase() : '');
+
   // Helper: generar filas de título y filtros para Excel
   const excelTitleRows = (title, filterObj, colCount) => {
     const titleStyle = { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center', vertical: 'center' } };
@@ -472,7 +474,7 @@ const DashboardFinanciero = ({ filters }) => {
     const filterParts = [];
     if (filterObj.mes) filterParts.push(capitalizeText(filterObj.mes));
     if (filterObj.semana) filterParts.push(`Semana ${filterObj.semana}`);
-    if (filterObj.cliente) filterParts.push(capitalizeText(filterObj.cliente));
+    if (filterObj.cliente) filterParts.push(upperText(filterObj.cliente));
     if (filterObj.transportista) filterParts.push(capitalizeText(filterObj.transportista));
     if (filterObj.unidad) filterParts.push(`Placa: ${filterObj.unidad.toUpperCase()}`);
     if (filterObj.divisa) filterParts.push(filterObj.divisa.toUpperCase());
@@ -497,7 +499,7 @@ const DashboardFinanciero = ({ filters }) => {
     const filterParts = [];
     if (filterObj.mes) filterParts.push(capitalizeText(filterObj.mes));
     if (filterObj.semana) filterParts.push(`Semana ${filterObj.semana}`);
-    if (filterObj.cliente) filterParts.push(capitalizeText(filterObj.cliente));
+    if (filterObj.cliente) filterParts.push(upperText(filterObj.cliente));
     if (filterObj.transportista) filterParts.push(capitalizeText(filterObj.transportista));
     if (filterObj.unidad) filterParts.push(`Placa: ${filterObj.unidad.toUpperCase()}`);
     if (filterObj.divisa) filterParts.push(String(filterObj.divisa).toUpperCase());
