@@ -307,15 +307,15 @@ const Documents = () => {
     return match ? Number.parseInt(match[1], 10) : -1;
   };
 
-  // Orden global: fecha mas reciente primero; desempate por numero de guia menor a mayor.
+  // Orden global: fecha mas antigua primero; desempate por numero de guia menor a mayor.
   filteredDocuments.sort((a, b) => {
-    const diff = getSortTimestamp(b) - getSortTimestamp(a);
+    const diff = getSortTimestamp(a) - getSortTimestamp(b);
     if (diff !== 0) return diff;
 
     const guideDiff = getGuideNumeric(a) - getGuideNumeric(b);
     if (guideDiff !== 0) return guideDiff;
 
-    return (Number(b?.id) || 0) - (Number(a?.id) || 0);
+    return (Number(a?.id) || 0) - (Number(b?.id) || 0);
   });
 
   const totalPages = Math.ceil(filteredDocuments.length / PAGE_SIZE);
