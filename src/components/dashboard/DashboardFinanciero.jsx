@@ -1207,7 +1207,7 @@ const DashboardFinanciero = ({ filters }) => {
                 <label>Mes</label>
                 <select value={localFilters.mes} onChange={e => handleFilterChange('mes', e.target.value)} disabled={filtersLoading}>
                   <option value="">Todos</option>
-                  {filterOptions.meses.map(m => <option key={m} value={m}>{m}</option>)}
+                  {filterOptions.meses.map(m => <option key={m} value={m}>{capitalizeText(m)}</option>)}
                 </select>
               </div>
               <div className="filter-item">
@@ -1346,7 +1346,7 @@ const DashboardFinanciero = ({ filters }) => {
                 <label>Mes</label>
                 <select value={localFiltersPagar.mes} onChange={e => handleFilterChangePagar('mes', e.target.value)} disabled={filtersLoadingPagar}>
                   <option value="">Todos</option>
-                  {filterOptionsPagar.meses.map(m => <option key={m} value={m}>{m}</option>)}
+                  {filterOptionsPagar.meses.map(m => <option key={m} value={m}>{capitalizeText(m)}</option>)}
                 </select>
               </div>
               <div className="filter-item">
@@ -1483,7 +1483,7 @@ const DashboardFinanciero = ({ filters }) => {
                 <label>Mes</label>
                 <select value={localFiltersMargen.mes} onChange={e => handleFilterChangeMargen('mes', e.target.value)} disabled={filtersLoadingMargen}>
                   <option value="">Todos</option>
-                  {filterOptionsMargen.meses.map(m => <option key={m} value={m}>{m}</option>)}
+                  {filterOptionsMargen.meses.map(m => <option key={m} value={m}>{capitalizeText(m)}</option>)}
                 </select>
               </div>
               <div className="filter-item">
@@ -1625,7 +1625,7 @@ const DashboardFinanciero = ({ filters }) => {
                 <label>Mes</label>
                 <select value={localFiltersTn.mes} onChange={e => handleFilterChangeTn('mes', e.target.value)} disabled={filtersLoadingTn}>
                   <option value="">Todos</option>
-                  {filterOptionsTn.meses.map(m => <option key={m} value={m}>{m}</option>)}
+                  {filterOptionsTn.meses.map(m => <option key={m} value={m}>{capitalizeText(m)}</option>)}
                 </select>
               </div>
               <div className="filter-item">
@@ -1746,7 +1746,7 @@ const DashboardFinanciero = ({ filters }) => {
                 <label>Mes <span className="required-badge">requerido</span></label>
                 <select value={localFiltersSeg.mes} onChange={e => handleFilterChangeSeg('mes', e.target.value)} disabled={filtersLoadingSeg}>
                   <option value="">-- Selecciona un mes --</option>
-                  {filterOptionsSeg.meses.map(m => <option key={m} value={m}>{m}</option>)}
+                  {filterOptionsSeg.meses.map(m => <option key={m} value={m}>{capitalizeText(m)}</option>)}
                 </select>
               </div>
               <div className="filter-item">

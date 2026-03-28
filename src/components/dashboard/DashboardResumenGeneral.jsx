@@ -10,6 +10,14 @@ const fmtNum = (n) => (Number(n) || 0).toLocaleString('en-US', {
   maximumFractionDigits: 2,
 });
 
+const toTitleCase = (text) => {
+  if (!text) return '';
+  return String(text)
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
+
 const DashboardResumenGeneral = () => {
   const [meses, setMeses] = useState([]);
   const [semanas, setSemanas] = useState([]);
@@ -174,7 +182,7 @@ const DashboardResumenGeneral = () => {
               <label>Mes</label>
               <select value={mes} onChange={(e) => setMes(e.target.value)}>
                 {meses.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={m} value={m}>{toTitleCase(m)}</option>
                 ))}
               </select>
             </div>

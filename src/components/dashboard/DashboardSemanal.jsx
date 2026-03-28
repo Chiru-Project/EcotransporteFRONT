@@ -11,6 +11,13 @@ import jsPDF from 'jspdf';
 import logoEmpresa from '../../assets/Images/logo-empresa.png';
 
 const fmtNum = (n) => parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const toTitleCase = (text) => {
+  if (!text) return '';
+  return String(text)
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
 
 const CHART_COLORS = [
   '#1B7430', '#4A86B8', '#E8913A', '#8E6BAD',
@@ -519,7 +526,7 @@ const DashboardSemanal = ({ filters: globalFilters }) => {
             >
               <option value="">Todos</option>
               {segmentadores.meses.map(mes => (
-                <option key={mes} value={mes}>{mes}</option>
+                <option key={mes} value={mes}>{toTitleCase(mes)}</option>
               ))}
             </select>
           </div>

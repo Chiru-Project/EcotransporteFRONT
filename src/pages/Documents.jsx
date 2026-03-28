@@ -263,8 +263,15 @@ const Documents = () => {
     }
   };
 
-  const isIncomplete = (doc) =>
-    !!doc.motivo && !doc.anulado;
+  const isIncomplete = (doc) => {
+    if (doc?.anulado) return false;
+
+    const hasMotivo = !!String(doc?.motivo || '').trim();
+    const missingTarifa = doc?.precio_unitario === null || doc?.precio_unitario === undefined || doc?.precio_unitario === '';
+
+    // Mantener misma regla visual que DocumentDetail: sin tarifa => incompleto.
+    return hasMotivo || missingTarifa;
+  };
 
   const incompleteCount = documents.filter(isIncomplete).length;
 
@@ -282,14 +289,34 @@ const Documents = () => {
     return matchesSearch && matchesIncomplete && matchesDateFrom && matchesDateTo;
   });
 
-  if (filterIncomplete) {
-    filteredDocuments.sort((a, b) => {
-      const dateA = a.fecha ? a.fecha.toString().substring(0, 10) : '';
-      const dateB = b.fecha ? b.fecha.toString().substring(0, 10) : '';
-      if (dateA !== dateB) return dateA.localeCompare(dateB);
-      return (a.grt || '').localeCompare(b.grt || '', undefined, { numeric: true });
-    });
-  }
+  const getSortTimestamp = (doc) => {
+    // Regla principal pedida: ordenar por FECHA del documento (no por created_at).
+    const fecha = doc?.fecha ? new Date(doc.fecha).getTime() : Number.NaN;
+    if (!Number.isNaN(fecha)) return fecha;
+
+    const fallback = doc?.created_at || doc?.updated_at;
+    const parsedFallback = fallback ? new Date(fallback).getTime() : Number.NaN;
+    if (!Number.isNaN(parsedFallback)) return parsedFallback;
+
+    return 0;
+  };
+
+  const getGuideNumeric = (doc) => {
+    const grt = String(doc?.grt || '').trim();
+    const match = grt.match(/(\d+)$/);
+    return match ? Number.parseInt(match[1], 10) : -1;
+  };
+
+  // Orden global: fecha mas reciente primero; desempate por numero de guia menor a mayor.
+  filteredDocuments.sort((a, b) => {
+    const diff = getSortTimestamp(b) - getSortTimestamp(a);
+    if (diff !== 0) return diff;
+
+    const guideDiff = getGuideNumeric(a) - getGuideNumeric(b);
+    if (guideDiff !== 0) return guideDiff;
+
+    return (Number(b?.id) || 0) - (Number(a?.id) || 0);
+  });
 
   const totalPages = Math.ceil(filteredDocuments.length / PAGE_SIZE);
   const paginatedDocuments = filteredDocuments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
@@ -302,13 +329,18 @@ const Documents = () => {
   // Formatear fecha
   const formatDate = (dateString) => {
     if (!dateString) return '-';
+    const isoPrefix = String(dateString).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoPrefix) {
+      const [, year, month, day] = isoPrefix;
+      return `${day}/${month}/${year}`;
+    }
+
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-PE', { 
-      day: '2-digit', 
-      month: '2-digit', 
+    if (Number.isNaN(date.getTime())) return String(dateString).substring(0, 10);
+    return date.toLocaleDateString('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     });
   };
 
@@ -400,7 +432,6 @@ const Documents = () => {
             <thead>
               <tr>
                 <th>Archivos</th>
-                <th></th>
                 <th>Fecha</th>
                 <th>GRT</th>
                 <th>GRR</th>
@@ -424,14 +455,7 @@ const Documents = () => {
                         📎
                       </button>
                     </td>
-                    <td className="lock-cell">
-                    {doc.anulado ? (
-                      <span className="anulado-icon" title="Documento anulado">🚫</span>
-                    ) : (
-                      <span className="lock-icon" title="Documento bloqueado - Solo editable el ticket">🔒</span>
-                    )}
-                  </td>
-                  <td>{doc.fecha}</td>
+                  <td className="date-col">{formatDate(doc.fecha)}</td>
                   <td className="code">{doc.grt}</td>
                   <td className="code">{doc.grr}</td>
                   <td>{doc.transportista}</td>
@@ -459,7 +483,7 @@ const Documents = () => {
                   </tr>
                   {openFilesFor === doc.id && (
                     <tr className="files-row">
-                      <td colSpan="10">
+                      <td colSpan="9">
                         <FileDropdown
                           document={doc}
                           onUpdate={(updated) => {

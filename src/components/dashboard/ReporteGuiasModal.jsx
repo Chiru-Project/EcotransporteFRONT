@@ -15,6 +15,14 @@ const ReporteGuiasModal = ({ isOpen, onClose }) => {
   const [loadingOpciones, setLoadingOpciones] = useState(false);
   const printRef = useRef();
 
+  const toTitleCase = (text) => {
+    if (!text) return '';
+    return String(text)
+      .split(' ')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  };
+
   const toBase64 = (blob) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result);
@@ -758,7 +766,7 @@ const ReporteGuiasModal = ({ isOpen, onClose }) => {
               disabled={!empresa}
             >
               <option value="">Seleccionar mes</option>
-              {meses.map(m => <option key={m} value={m}>{m}</option>)}
+              {meses.map(m => <option key={m} value={m}>{toTitleCase(m)}</option>)}
             </select>
           </div>
 

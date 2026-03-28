@@ -785,15 +785,16 @@ const ViajesCliente = () => {
                     <ResponsiveContainer width="100%" height={Math.max(340, toneladasPorFecha.length * 40)}>
                       <BarChart
                         data={toneladasPorFecha}
-                        margin={{ top: 10, right: 30, left: 10, bottom: 32 }}
+                        margin={{ top: 10, right: 30, left: 10, bottom: 18 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           dataKey="fechaLabel"
                           tick={{ fontSize: 11, fill: '#555' }}
-                          angle={-20}
-                          textAnchor="end"
-                          height={52}
+                          interval={0}
+                          tickMargin={8}
+                          textAnchor="middle"
+                          height={34}
                         />
                         <YAxis tick={{ fontSize: 11, fill: '#555' }} width={75} />
                         <Tooltip

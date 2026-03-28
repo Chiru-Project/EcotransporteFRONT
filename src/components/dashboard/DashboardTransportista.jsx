@@ -8,7 +8,6 @@ import {
 import { useIsMobile } from '../../hooks/useIsMobile';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import XLSX from 'xlsx-js-style';
 import logoEmpresa from '../../assets/Images/logo-empresa.png';
 import './DashboardComponents.css';
 
@@ -218,14 +217,46 @@ const DashboardTransportista = () => {
     }
   };
 
-  const descargarDetalleExcel = () => {
+  const descargarDetalleExcel = async () => {
     const filtered = detalleTransportista.filter(item => !divisaFiltro || (item.divisa_cost || 'PEN') === divisaFiltro);
     if (filtered.length === 0) return;
-    const wb = XLSX.utils.book_new();
-    const colCount = 5;
-    const capitalizeText = (t) => t ? t.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') : '';
-    const titleStyle = { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center', vertical: 'center' } };
-    const filterStyle = { font: { bold: false, sz: 11, color: { rgb: '333333' } }, fill: { fgColor: { rgb: 'E8F5E9' } }, alignment: { horizontal: 'center', vertical: 'center' } };
+
+    const { default: ExcelJS } = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Detalle Transportista');
+    worksheet.views = [{ state: 'frozen', ySplit: 6 }];
+
+    worksheet.columns = [
+      { key: 'transportista', width: 38 },
+      { key: 'traslados', width: 12 },
+      { key: 'peso', width: 18 },
+      { key: 'divisa', width: 10 },
+      { key: 'precio', width: 18 },
+    ];
+
+    const generatedAt = new Date().toLocaleString('es-PE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
+
+    worksheet.mergeCells('A1:A2');
+    worksheet.getCell('A1').value = '';
+
+    worksheet.mergeCells('B1:E1');
+    worksheet.getCell('B1').value = 'ECOTRANSPORTE - DETALLE POR TRANSPORTISTA';
+    worksheet.getCell('B1').font = { bold: true, size: 14, color: { argb: 'FF1B7430' } };
+    worksheet.getCell('B1').alignment = { horizontal: 'left', vertical: 'middle' };
+
+    worksheet.mergeCells('B2:E2');
+    worksheet.getCell('B2').value = `Generado: ${generatedAt}`;
+    worksheet.getCell('B2').font = { size: 10, color: { argb: 'FF4B5563' } };
+    worksheet.getCell('B2').alignment = { horizontal: 'left', vertical: 'middle' };
+
     const filterParts = [];
     if (localFilters.mes) filterParts.push(capitalizeText(localFilters.mes));
     if (localFilters.cliente) filterParts.push(capitalizeText(localFilters.cliente));
@@ -233,35 +264,90 @@ const DashboardTransportista = () => {
     if (localFilters.unidad) filterParts.push(`Placa: ${localFilters.unidad.toUpperCase()}`);
     if (divisaFiltro) filterParts.push(divisaFiltro.toUpperCase());
     const filterText = filterParts.length > 0 ? filterParts.join(' — ') : 'Sin filtros';
-    const titleRow = Array(colCount).fill({ v: '', s: titleStyle });
-    titleRow[0] = { v: 'Detalle Transportista', s: titleStyle };
-    const filterRow = Array(colCount).fill({ v: '', s: filterStyle });
-    filterRow[0] = { v: filterText, s: filterStyle };
-    const emptyRow = Array(colCount).fill({ v: '' });
-    const merges = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } },
-      { s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } },
-    ];
-    const hStyle = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: '145A25' } } } };
-    const cellL = { font: { sz: 10 }, alignment: { horizontal: 'left' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellR = { font: { sz: 10 }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellN = { font: { sz: 10 }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const rows = [
-      titleRow, filterRow, emptyRow,
-      [{ v: 'Transportista', s: hStyle }, { v: 'Traslados', s: hStyle }, { v: 'Peso Ticket (TN)', s: hStyle }, { v: 'Divisa', s: hStyle }, { v: 'Precio con IGV', s: hStyle }],
-      ...filtered.sort((a, b) => (parseInt(b.cantidad_traslados) || 0) - (parseInt(a.cantidad_traslados) || 0)).map(item => [
-        { v: item.transportista || 'Sin asignar', s: cellL },
-        { v: parseInt(item.cantidad_traslados) || 0, t: 'n', s: cellN },
-        { v: Math.round((parseFloat(item.tn_recibido) || 0) * 100) / 100, t: 'n', s: cellR },
-        { v: item.divisa_cost || 'PEN', s: cellN },
-        { v: Math.round((parseFloat(item.precio_total) || 0) * 100) / 100, t: 'n', s: cellR },
-      ])
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, { wch: 12 }, { wch: 18 }, { wch: 10 }, { wch: 18 }];
-    ws['!merges'] = merges;
-    XLSX.utils.book_append_sheet(wb, ws, 'Detalle Transportista');
-    XLSX.writeFile(wb, 'Detalle_Transportista.xlsx');
+
+    worksheet.mergeCells('A4:E4');
+    worksheet.getCell('A4').value = filterText;
+    worksheet.getCell('A4').font = { bold: true, size: 10, color: { argb: 'FF374151' } };
+    worksheet.getCell('A4').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8F5E9' } };
+
+    try {
+      const logoBase64 = await loadImageAsDataUrl(logoEmpresa);
+      const imageId = workbook.addImage({
+        base64: logoBase64,
+        extension: 'png',
+      });
+      worksheet.addImage(imageId, {
+        tl: { col: 0.08, row: 0.12 },
+        ext: { width: 132, height: 52 },
+        editAs: 'oneCell',
+      });
+    } catch (logoError) {
+      console.warn('No se pudo insertar el logo en Excel de transportista:', logoError);
+    }
+
+    const headerRow = worksheet.getRow(6);
+    headerRow.values = ['Transportista', 'Traslados', 'Peso Ticket (TN)', 'Divisa', 'Precio con IGV'];
+    headerRow.height = 22;
+
+    for (let col = 1; col <= 5; col++) {
+      const cell = headerRow.getCell(col);
+      cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B7430' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF15803D' } },
+        left: { style: 'thin', color: { argb: 'FF15803D' } },
+        bottom: { style: 'thin', color: { argb: 'FF15803D' } },
+        right: { style: 'thin', color: { argb: 'FF15803D' } },
+      };
+    }
+
+    filtered
+      .sort((a, b) => (parseInt(b.cantidad_traslados) || 0) - (parseInt(a.cantidad_traslados) || 0))
+      .forEach((item) => {
+        const row = worksheet.addRow({
+          transportista: item.transportista || 'Sin asignar',
+          traslados: parseInt(item.cantidad_traslados) || 0,
+          peso: Math.round((parseFloat(item.tn_recibido) || 0) * 100) / 100,
+          divisa: item.divisa_cost || 'PEN',
+          precio: Math.round((parseFloat(item.precio_total) || 0) * 100) / 100,
+        });
+
+        row.getCell(2).numFmt = '#,##0';
+        row.getCell(3).numFmt = '#,##0.00';
+        row.getCell(5).numFmt = '#,##0.00';
+
+        row.eachCell((cell, colNumber) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+            right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          };
+          cell.font = { size: 10, color: { argb: 'FF1E2A3A' } };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: colNumber === 1 ? 'left' : (colNumber === 4 ? 'center' : 'right'),
+          };
+        });
+      });
+
+    worksheet.getRow(1).height = 34;
+    worksheet.getRow(2).height = 22;
+    worksheet.getRow(4).height = 20;
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Detalle_Transportista.xlsx';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   };
 
   const [localFilters, setLocalFilters] = useState({
@@ -422,7 +508,7 @@ const DashboardTransportista = () => {
             <label>Mes</label>
             <select value={localFilters.mes} onChange={(e) => handleFilterChange('mes', e.target.value)} disabled={filtersLoading}>
               <option value="">Todos</option>
-              {segmentadores.meses.map(m => <option key={m} value={m}>{m}</option>)}
+              {segmentadores.meses.map(m => <option key={m} value={m}>{capitalizeText(m)}</option>)}
             </select>
           </div>
           <div className="filter-item">

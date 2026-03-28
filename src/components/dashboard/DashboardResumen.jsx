@@ -12,6 +12,13 @@ import './DashboardComponents.css';
 const fmtNum = (n) => parseFloat(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const FILTER_FIELDS = ['mes', 'semana', 'cliente', 'transportista', 'unidad', 'transportado'];
+const toTitleCase = (text) => {
+  if (!text) return '';
+  return String(text)
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+};
 
 const DashboardResumen = () => {
   const isMobile = useIsMobile();
@@ -250,7 +257,7 @@ const DashboardResumen = () => {
               disabled={filtersLoading}
             >
               <option value="">Todos</option>
-              {segmentadores.meses.map(mes => <option key={mes} value={mes}>{mes}</option>)}
+              {segmentadores.meses.map(mes => <option key={mes} value={mes}>{toTitleCase(mes)}</option>)}
             </select>
           </div>
           <div className="filter-item">

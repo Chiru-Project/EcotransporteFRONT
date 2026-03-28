@@ -223,20 +223,11 @@
   overflow-x: auto;
 }
 
-/* Columna de candado */
-.lock-cell {
-  width: 30px;
-  text-align: center;
-}
-
-.lock-icon {
-  font-size: 1rem;
-  cursor: help;
-}
-
-.anulado-icon {
-  font-size: 1rem;
-  cursor: help;
+.date-col {
+  min-width: 120px;
+  width: 120px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Fila de documento anulado */
