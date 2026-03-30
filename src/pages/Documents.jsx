@@ -173,7 +173,7 @@ const Documents = () => {
           conductor: doc.transportista || '',
           peso: Number.isFinite(numericTnRecibida) ? numericTnRecibida : '',
           cliente: doc.cliente || '',
-          factura: doc.factura || '',
+          factura: doc.anulado ? 'ANULADO' : (doc.factura || ''),
           archivos: firstFile ? getFriendlyFileName(firstFile) : '',
         });
 
