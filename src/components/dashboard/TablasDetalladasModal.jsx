@@ -3,7 +3,6 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { dashboardService } from '../../services/api';
 import logoEmpresa from '../../assets/Images/logo-empresa.png';
-import logoEmpresaInline from '../../assets/Images/logo-empresa.png?inline';
 import './TablasDetalladasModal.css';
 
 const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
@@ -169,48 +168,20 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
       const formatTn = (value) => (isZeroLike(value) ? '-' : `${formatNumber(value)} TN`);
       const formatMoney = (value, currencySymbol) => (isZeroLike(value) ? '-' : `${currencySymbol}${formatNumber(value)}`);
 
-      let logoImageId = null;
+      let logoBase64 = '';
+      let logoExtension = 'png';
       try {
-        let logoDataUrl = '';
-        let logoExtension = 'png';
-
-        // Primary path: inline asset (DataURL) avoids URL/CORS/path issues.
-        if (typeof logoEmpresaInline === 'string' && logoEmpresaInline.startsWith('data:image/')) {
-          logoDataUrl = logoEmpresaInline;
-          logoExtension = logoEmpresaInline.includes('image/jpeg') ? 'jpeg' : 'png';
-        }
-
-        // Fallbacks: match working fetch pattern from Documents.
-        if (!logoDataUrl) {
-          const logoSources = [
-            logoEmpresa,
-            '/src/assets/Images/logo-empresa.png',
-            'http://localhost:5173/src/assets/Images/logo-empresa.png',
-          ];
-
-          for (const source of logoSources) {
-            try {
-              const logoResponse = await fetch(source, { cache: 'no-store' });
-              if (!logoResponse.ok) continue;
-              const logoBlob = await logoResponse.blob();
-              const dataUrl = await toBase64(logoBlob);
-              if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
-                logoDataUrl = dataUrl;
-                logoExtension = dataUrl.includes('image/jpeg') ? 'jpeg' : 'png';
-                break;
-              }
-            } catch {
-              // Keep trying remaining sources.
-            }
+        const logoResponse = await fetch(logoEmpresa, { cache: 'no-store' });
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const dataUrl = await toBase64(logoBlob);
+          if (typeof dataUrl === 'string' && dataUrl.startsWith('data:image/')) {
+            logoBase64 = dataUrl;
+            logoExtension = dataUrl.includes('image/jpeg') ? 'jpeg' : 'png';
           }
         }
 
-        if (logoDataUrl) {
-          logoImageId = workbook.addImage({
-            base64: logoDataUrl,
-            extension: logoExtension,
-          });
-        } else {
+        if (!logoBase64) {
           console.warn('No se pudo cargar logo para Excel (Tablas Detalladas).');
         }
       } catch (logoError) {
@@ -218,8 +189,13 @@ const TablasDetalladasModal = ({ isOpen, onClose, mesesDisponibles }) => {
       }
 
       const placeLogo = (worksheet) => {
-        if (!logoImageId) return;
-        worksheet.addImage(logoImageId, {
+        if (!logoBase64) return;
+        // Crear un imageId por hoja evita problemas de render en algunos visores de XLSX.
+        const imageId = workbook.addImage({
+          base64: logoBase64,
+          extension: logoExtension,
+        });
+        worksheet.addImage(imageId, {
           tl: { col: 0.08, row: 0.12 },
           ext: { width: 128, height: 52 },
           editAs: 'oneCell',

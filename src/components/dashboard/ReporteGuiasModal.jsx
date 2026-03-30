@@ -445,8 +445,8 @@ const ReporteGuiasModal = ({ isOpen, onClose }) => {
           extension: 'png',
         });
         worksheet.addImage(imageId, {
-          tl: { col: 0.08, row: 0.02 },
-          ext: { width: 170, height: 56 },
+          tl: { col: 0.1, row: 0.16 },
+          ext: { width: 130, height: 60 },
           editAs: 'oneCell',
         });
       } catch (logoError) {

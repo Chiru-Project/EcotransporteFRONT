@@ -111,11 +111,13 @@ const DocumentDetail = () => {
 
       {(() => {
         const faltantes = [];
+        const tarifaSinAsignar = document.precio_unitario === null || document.precio_unitario === undefined || document.precio_unitario === '';
+        const tarifaEsCero = !tarifaSinAsignar && Number(document.precio_unitario) === 0;
         if (!document.cliente) faltantes.push('Cliente no identificado');
         if (!document.partida) faltantes.push('Punto de partida no identificado');
         if (!document.llegada) faltantes.push('Punto de llegada no identificado');
         if (!document.transportado) faltantes.push('Material transportado no reconocido');
-        if (!document.precio_unitario) faltantes.push('Tarifa no encontrada');
+        if (tarifaSinAsignar) faltantes.push('Tarifa no encontrada');
         if (!document.unidad) faltantes.push('Placa del vehículo no identificada');
         if (faltantes.length > 0) {
           return (
@@ -128,6 +130,19 @@ const DocumentDetail = () => {
             </div>
           );
         }
+
+        if (tarifaEsCero) {
+          return (
+            <div className="tarifa-cero-detail-banner">
+              <div className="tarifa-cero-detail-icon">&#9432;</div>
+              <div className="tarifa-cero-detail-body">
+                <strong>Tarifa en 0.00</strong>
+                <p className="tarifa-cero-detail-text">La tarifa de este cliente es 0.00 en el tarifario y es un valor valido.</p>
+              </div>
+            </div>
+          );
+        }
+
         return null;
       })()}
       <div className="detail-header">

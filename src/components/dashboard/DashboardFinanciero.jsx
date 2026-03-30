@@ -7,7 +7,6 @@ import {
 import { useIsMobile } from '../../hooks/useIsMobile';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import XLSX from 'xlsx-js-style';
 import logoEmpresa from '../../assets/Images/logo-empresa.png';
 import './DashboardComponents.css';
 
@@ -467,32 +466,97 @@ const DashboardFinanciero = ({ filters }) => {
 
   const upperText = (text) => (text ? String(text).toUpperCase() : '');
 
-  // Helper: generar filas de título y filtros para Excel
-  const excelTitleRows = (title, filterObj, colCount) => {
-    const titleStyle = { font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center', vertical: 'center' } };
-    const filterStyle = { font: { bold: false, sz: 11, color: { rgb: '333333' } }, fill: { fgColor: { rgb: 'E8F5E9' } }, alignment: { horizontal: 'center', vertical: 'center' } };
+  const getExcelFilterText = (filterObj = {}) => {
     const filterParts = [];
     if (filterObj.mes) filterParts.push(capitalizeText(filterObj.mes));
     if (filterObj.semana) filterParts.push(`Semana ${filterObj.semana}`);
     if (filterObj.cliente) filterParts.push(upperText(filterObj.cliente));
     if (filterObj.transportista) filterParts.push(capitalizeText(filterObj.transportista));
     if (filterObj.unidad) filterParts.push(`Placa: ${filterObj.unidad.toUpperCase()}`);
-    if (filterObj.divisa) filterParts.push(filterObj.divisa.toUpperCase());
-    const filterText = filterParts.length > 0 ? filterParts.join(' — ') : 'Sin filtros';
+    if (filterObj.divisa) filterParts.push(String(filterObj.divisa).toUpperCase());
+    return filterParts.length > 0 ? filterParts.join(' - ') : 'Sin filtros';
+  };
 
-    const titleRow = Array(colCount).fill({ v: '', s: titleStyle });
-    titleRow[0] = { v: title, s: titleStyle };
-    const filterRow = Array(colCount).fill({ v: '', s: filterStyle });
-    filterRow[0] = { v: filterText, s: filterStyle };
-    const emptyRow = Array(colCount).fill({ v: '' });
-
-    return {
-      rows: [titleRow, filterRow, emptyRow],
-      merges: [
-        { s: { r: 0, c: 0 }, e: { r: 0, c: colCount - 1 } },
-        { s: { r: 1, c: 0 }, e: { r: 1, c: colCount - 1 } },
-      ],
+  const styleExcelHeaderCell = (cell, fillColor = 'FF1B7430') => {
+    cell.font = { bold: true, size: 10, color: { argb: 'FFFFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillColor } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF15803D' } },
+      left: { style: 'thin', color: { argb: 'FF15803D' } },
+      bottom: { style: 'thin', color: { argb: 'FF15803D' } },
+      right: { style: 'thin', color: { argb: 'FF15803D' } },
     };
+  };
+
+  const styleExcelDataCell = (cell, horizontal = 'left') => {
+    cell.font = { size: 10, color: { argb: 'FF1E2A3A' } };
+    cell.alignment = { vertical: 'middle', horizontal };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+    };
+  };
+
+  const downloadExcelWorkbook = async (workbook, fileName) => {
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const addExcelBranding = async ({ workbook, worksheet, title, filterObj, colCount }) => {
+    worksheet.views = [{ state: 'frozen', ySplit: 6 }];
+
+    worksheet.mergeCells(1, 1, 2, 1);
+    worksheet.getCell(1, 1).value = '';
+
+    worksheet.mergeCells(1, 2, 1, colCount);
+    worksheet.getCell(1, 2).value = `ECOTRANSPORTE - ${title}`;
+    worksheet.getCell(1, 2).font = { bold: true, size: 15, color: { argb: 'FF1B7430' } };
+    worksheet.getCell(1, 2).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+    worksheet.mergeCells(2, 2, 2, colCount);
+    worksheet.getCell(2, 2).value = `Generado: ${new Date().toLocaleString('es-PE')}`;
+    worksheet.getCell(2, 2).font = { size: 10, color: { argb: 'FF4B5563' } };
+    worksheet.getCell(2, 2).alignment = { vertical: 'middle', horizontal: 'left' };
+
+    worksheet.mergeCells(4, 1, 4, colCount);
+    worksheet.getCell(4, 1).value = `Filtros: ${getExcelFilterText(filterObj)}`;
+    worksheet.getCell(4, 1).font = { bold: true, size: 10, color: { argb: 'FF374151' } };
+    worksheet.getCell(4, 1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5F4E7' } };
+    worksheet.getCell(4, 1).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+    try {
+      const logoBase64 = await loadImageAsDataUrl(logoEmpresa);
+      const imageId = workbook.addImage({
+        base64: logoBase64,
+        extension: 'png',
+      });
+      worksheet.addImage(imageId, {
+        tl: { col: 0.12, row: 0.22 },
+        ext: { width: 94, height: 38 },
+        editAs: 'oneCell',
+      });
+    } catch (logoError) {
+      console.warn('No se pudo insertar el logo en Excel:', logoError);
+    }
+
+    worksheet.getRow(1).height = 30;
+    worksheet.getRow(2).height = 22;
+    worksheet.getRow(4).height = 20;
+
+    return 6;
   };
 
   const getPdfSubtitle = (filterObj = {}) => {
@@ -753,29 +817,55 @@ const DashboardFinanciero = ({ filters }) => {
     finally { setExportingMargenChartPdf(false); }
   };
 
-  const descargarCobrarExcel = () => {
+  const descargarCobrarExcel = async () => {
     if (porCobrar.length === 0) return;
-    const wb = XLSX.utils.book_new();
-    const colCount = 4;
-    const { rows: titleRows, merges } = excelTitleRows('Por Cobrar', localFilters, colCount);
-    const hStyle = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: '145A25' } } } };
-    const cellL = { font: { sz: 10 }, alignment: { horizontal: 'left' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellR = { font: { sz: 10 }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const rows = [
-      ...titleRows,
-      [{ v: 'Cliente', s: hStyle }, { v: 'Empresa', s: hStyle }, { v: 'Divisa', s: hStyle }, { v: 'Por Cobrar', s: hStyle }],
-      ...porCobrar.map(item => [
-        { v: item.cliente || 'Sin cliente', s: cellL },
-        { v: formatEmpresa(item.empresa), s: cellL },
-        { v: item.divisa || 'PEN', s: cellL },
-        { v: Math.round((Number(item.total) || 0) * 100) / 100, t: 'n', s: cellR },
-      ])
+
+    const { default: ExcelJS } = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Por Cobrar');
+    worksheet.columns = [
+      { width: 35 },
+      { width: 25 },
+      { width: 10 },
+      { width: 18 },
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 10 }, { wch: 18 }];
-    ws['!merges'] = merges;
-    XLSX.utils.book_append_sheet(wb, ws, 'Por Cobrar');
-    XLSX.writeFile(wb, 'Por_Cobrar.xlsx');
+
+    const headerRowNumber = await addExcelBranding({
+      workbook,
+      worksheet,
+      title: 'POR COBRAR',
+      filterObj: localFilters,
+      colCount: 4,
+    });
+
+    const headerRow = worksheet.getRow(headerRowNumber);
+    headerRow.values = ['Cliente', 'Empresa', 'Divisa', 'Por Cobrar'];
+    headerRow.height = 22;
+    for (let col = 1; col <= 4; col++) {
+      styleExcelHeaderCell(headerRow.getCell(col));
+    }
+
+    porCobrar.forEach((item) => {
+      const row = worksheet.addRow([
+        item.cliente || 'Sin cliente',
+        formatEmpresa(item.empresa),
+        item.divisa || 'PEN',
+        Math.round((Number(item.total) || 0) * 100) / 100,
+      ]);
+
+      styleExcelDataCell(row.getCell(1), 'left');
+      styleExcelDataCell(row.getCell(2), 'left');
+      styleExcelDataCell(row.getCell(3), 'center');
+      styleExcelDataCell(row.getCell(4), 'right');
+      row.getCell(4).numFmt = '#,##0.00';
+    });
+
+    worksheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: headerRowNumber, column: 4 },
+    };
+
+    await downloadExcelWorkbook(workbook, 'Por_Cobrar.xlsx');
   };
 
   const descargarMargenPDF = async () => {
@@ -793,33 +883,60 @@ const DashboardFinanciero = ({ filters }) => {
     finally { setExportingMargenPdf(false); }
   };
 
-  const descargarMargenExcel = () => {
+  const descargarMargenExcel = async () => {
     if (margenOperativo.length === 0) return;
-    const wb = XLSX.utils.book_new();
-    const colCount = 4;
-    const { rows: titleRows, merges } = excelTitleRows('Margen Operativo', localFiltersMargen, colCount);
-    const hStyle = { font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4A86B8' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: '3A6E9A' } } } };
-    const cellL = { font: { sz: 10 }, alignment: { horizontal: 'left' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellPos = { font: { sz: 10, color: { rgb: '1B7430' } }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellNeg = { font: { sz: 10, color: { rgb: 'CC3333' } }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const rows = [
-      ...titleRows,
-      [{ v: 'Cliente', s: hStyle }, { v: 'Empresa', s: hStyle }, { v: 'Divisa', s: hStyle }, { v: 'Margen Operativo', s: hStyle }],
-      ...margenOperativo.map(item => {
-        const val = Math.round((Number(item.total) || 0) * 100) / 100;
-        return [
-          { v: item.cliente || 'Sin cliente', s: cellL },
-          { v: formatEmpresa(item.empresa), s: cellL },
-          { v: item.divisa || 'PEN', s: cellL },
-          { v: val, t: 'n', s: val >= 0 ? cellPos : cellNeg },
-        ];
-      })
+
+    const { default: ExcelJS } = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Margen Operativo');
+    worksheet.columns = [
+      { width: 35 },
+      { width: 25 },
+      { width: 10 },
+      { width: 20 },
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 10 }, { wch: 20 }];
-    ws['!merges'] = merges;
-    XLSX.utils.book_append_sheet(wb, ws, 'Margen Operativo');
-    XLSX.writeFile(wb, 'Margen_Operativo.xlsx');
+
+    const headerRowNumber = await addExcelBranding({
+      workbook,
+      worksheet,
+      title: 'MARGEN OPERATIVO',
+      filterObj: localFiltersMargen,
+      colCount: 4,
+    });
+
+    const headerRow = worksheet.getRow(headerRowNumber);
+    headerRow.values = ['Cliente', 'Empresa', 'Divisa', 'Margen Operativo'];
+    headerRow.height = 22;
+    for (let col = 1; col <= 4; col++) {
+      styleExcelHeaderCell(headerRow.getCell(col), 'FF4A86B8');
+    }
+
+    margenOperativo.forEach((item) => {
+      const val = Math.round((Number(item.total) || 0) * 100) / 100;
+      const row = worksheet.addRow([
+        item.cliente || 'Sin cliente',
+        formatEmpresa(item.empresa),
+        item.divisa || 'PEN',
+        val,
+      ]);
+
+      styleExcelDataCell(row.getCell(1), 'left');
+      styleExcelDataCell(row.getCell(2), 'left');
+      styleExcelDataCell(row.getCell(3), 'center');
+      styleExcelDataCell(row.getCell(4), 'right');
+      row.getCell(4).numFmt = '#,##0.00';
+      row.getCell(4).font = {
+        size: 10,
+        color: { argb: val >= 0 ? 'FF1B7430' : 'FFCC3333' },
+      };
+    });
+
+    worksheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: headerRowNumber, column: 4 },
+    };
+
+    await downloadExcelWorkbook(workbook, 'Margen_Operativo.xlsx');
   };
 
   const descargarSegPDF = async () => {
@@ -936,44 +1053,76 @@ const DashboardFinanciero = ({ filters }) => {
     finally { setExportingSegPdf(false); }
   };
 
-  const descargarSegExcel = () => {
+  const descargarSegExcel = async () => {
     if (seguimiento.length === 0) return;
+
     const sData = prepareSeguimientoData(seguimiento);
-    const wb = XLSX.utils.book_new();
-    const hStyle = { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center', wrapText: true }, border: { bottom: { style: 'medium', color: { rgb: '145A25' } } } };
-    const hSem = { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '4A86B8' } }, alignment: { horizontal: 'center', wrapText: true }, border: { bottom: { style: 'medium', color: { rgb: '3A6E9A' } } } };
-    const hTotal = { font: { bold: true, sz: 10, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'C4883A' } }, alignment: { horizontal: 'center' }, border: { bottom: { style: 'medium', color: { rgb: 'A06B2D' } } } };
-    const cellL = { font: { sz: 10 }, alignment: { horizontal: 'left' }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellN = { font: { sz: 10 }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
-    const cellT = { font: { bold: true, sz: 10 }, alignment: { horizontal: 'right' }, numFmt: '#,##0.00', fill: { fgColor: { rgb: 'FFF8E1' } }, border: { bottom: { style: 'thin', color: { rgb: 'E0E0E0' } } } };
+    const { default: ExcelJS } = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Seguimiento');
 
     const colCount = 3 + sData.semanas.length + 1;
-    const { rows: titleRows, merges } = excelTitleRows('Seguimiento de Transporte', localFiltersSeg, colCount);
-    const header = [
-      { v: 'Cliente', s: hStyle },
-      { v: 'Empresa', s: hStyle },
-      { v: 'Placa', s: hStyle },
-      ...sData.semanas.map(s => ({ v: `Sem. ${s} (TN Rec.)`, s: hSem })),
-      { v: 'Total (TN)', s: hTotal },
+    worksheet.columns = [
+      { width: 30 },
+      { width: 22 },
+      { width: 10 },
+      ...sData.semanas.map(() => ({ width: 16 })),
+      { width: 14 },
     ];
-    const rows = [...titleRows, header];
 
-    for (const row of sData.rows) {
-      const total = sData.semanas.reduce((sum, s) => sum + (row[s] || 0), 0);
-      rows.push([
-        { v: row.cliente || 'Sin cliente', s: cellL },
-        { v: formatEmpresa(row.empresa), s: cellL },
-        { v: row.placa || '', s: cellL },
-        ...sData.semanas.map(s => row[s] ? { v: Math.round((Number(row[s]) || 0) * 100) / 100, t: 'n', s: cellN } : { v: '', s: cellL }),
-        { v: Math.round(total * 100) / 100, t: 'n', s: cellT },
-      ]);
+    const headerRowNumber = await addExcelBranding({
+      workbook,
+      worksheet,
+      title: 'SEGUIMIENTO DE TRANSPORTE',
+      filterObj: localFiltersSeg,
+      colCount,
+    });
+
+    const headerValues = ['Cliente', 'Empresa', 'Placa', ...sData.semanas.map((s) => `Sem. ${s} (TN Rec.)`), 'Total (TN)'];
+    const headerRow = worksheet.getRow(headerRowNumber);
+    headerRow.values = headerValues;
+    headerRow.height = 22;
+
+    for (let col = 1; col <= headerValues.length; col++) {
+      const isWeekCol = col >= 4 && col < headerValues.length;
+      const isTotalCol = col === headerValues.length;
+      const fillColor = isTotalCol ? 'FFC4883A' : (isWeekCol ? 'FF4A86B8' : 'FF1B7430');
+      styleExcelHeaderCell(headerRow.getCell(col), fillColor);
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 10 }, ...sData.semanas.map(() => ({ wch: 16 })), { wch: 14 }];
-    ws['!merges'] = merges;
-    XLSX.utils.book_append_sheet(wb, ws, 'Seguimiento');
-    XLSX.writeFile(wb, 'Seguimiento_Transporte.xlsx');
+    for (const rowData of sData.rows) {
+      const total = sData.semanas.reduce((sum, s) => sum + (rowData[s] || 0), 0);
+      const row = worksheet.addRow([
+        rowData.cliente || 'Sin cliente',
+        formatEmpresa(rowData.empresa),
+        rowData.placa || '',
+        ...sData.semanas.map((s) => Math.round((Number(rowData[s]) || 0) * 100) / 100),
+        Math.round(total * 100) / 100,
+      ]);
+
+      styleExcelDataCell(row.getCell(1), 'left');
+      styleExcelDataCell(row.getCell(2), 'left');
+      styleExcelDataCell(row.getCell(3), 'center');
+
+      for (let col = 4; col <= headerValues.length; col++) {
+        styleExcelDataCell(row.getCell(col), 'right');
+        row.getCell(col).numFmt = '#,##0.00';
+      }
+
+      row.getCell(headerValues.length).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFF8E1' },
+      };
+      row.getCell(headerValues.length).font = { bold: true, size: 10, color: { argb: 'FF1E2A3A' } };
+    }
+
+    worksheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: headerRowNumber, column: headerValues.length },
+    };
+
+    await downloadExcelWorkbook(workbook, 'Seguimiento_Transporte.xlsx');
   };
 
   const descargarPagarPDF = async () => {
@@ -991,30 +1140,56 @@ const DashboardFinanciero = ({ filters }) => {
     finally { setExportingPagarPdf(false); }
   };
 
-  const descargarPagarExcel = () => {
+  const descargarPagarExcel = async () => {
     if (porPagar.length === 0) return;
-    const wb = XLSX.utils.book_new();
-    const colCount = 4;
-    const { rows: titleRows, merges } = excelTitleRows('Por Pagar', localFiltersPagar, colCount);
-    const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center' } };
-    const cellStyle = { alignment: { horizontal: 'left' } };
-    const numStyle = { alignment: { horizontal: 'right' }, numFmt: '#,##0.00' };
-    const filtered = porPagar.filter(item => item.empresa !== 'ECOTRANSPORTE');
-    const rows = [
-      ...titleRows,
-      [{ v: 'Cliente', s: headerStyle }, { v: 'Empresa', s: headerStyle }, { v: 'Divisa', s: headerStyle }, { v: 'Por Pagar', s: headerStyle }],
-      ...filtered.map(item => [
-        { v: item.cliente || 'Sin cliente', s: cellStyle },
-        { v: item.empresa || 'SIN EMPRESA', s: cellStyle },
-        { v: item.divisa || 'PEN', s: cellStyle },
-        { v: Math.round((Number(item.total) || 0) * 100) / 100, t: 'n', s: numStyle },
-      ])
+
+    const { default: ExcelJS } = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Por Pagar');
+    worksheet.columns = [
+      { width: 35 },
+      { width: 20 },
+      { width: 10 },
+      { width: 18 },
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, { wch: 20 }, { wch: 10 }, { wch: 18 }];
-    ws['!merges'] = merges;
-    XLSX.utils.book_append_sheet(wb, ws, 'Por Pagar');
-    XLSX.writeFile(wb, 'Por_Pagar.xlsx');
+
+    const headerRowNumber = await addExcelBranding({
+      workbook,
+      worksheet,
+      title: 'POR PAGAR',
+      filterObj: localFiltersPagar,
+      colCount: 4,
+    });
+
+    const headerRow = worksheet.getRow(headerRowNumber);
+    headerRow.values = ['Cliente', 'Empresa', 'Divisa', 'Por Pagar'];
+    headerRow.height = 22;
+    for (let col = 1; col <= 4; col++) {
+      styleExcelHeaderCell(headerRow.getCell(col));
+    }
+
+    const filtered = porPagar.filter((item) => item.empresa !== 'ECOTRANSPORTE');
+    filtered.forEach((item) => {
+      const row = worksheet.addRow([
+        item.cliente || 'Sin cliente',
+        item.empresa || 'SIN EMPRESA',
+        item.divisa || 'PEN',
+        Math.round((Number(item.total) || 0) * 100) / 100,
+      ]);
+
+      styleExcelDataCell(row.getCell(1), 'left');
+      styleExcelDataCell(row.getCell(2), 'left');
+      styleExcelDataCell(row.getCell(3), 'center');
+      styleExcelDataCell(row.getCell(4), 'right');
+      row.getCell(4).numFmt = '#,##0.00';
+    });
+
+    worksheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: headerRowNumber, column: 4 },
+    };
+
+    await downloadExcelWorkbook(workbook, 'Por_Pagar.xlsx');
   };
 
   const descargarTnPDF = async () => {
@@ -1035,31 +1210,56 @@ const DashboardFinanciero = ({ filters }) => {
     finally { setExportingTnPdf(false); }
   };
 
-  const descargarTnExcel = () => {
+  const descargarTnExcel = async () => {
     if (tnClienteEmpresa.length === 0) return;
-    const wb = XLSX.utils.book_new();
-    const colCount = 3;
-    const tnTitle = localFiltersTn.mes
-      ? `TN Total Recibido / Cliente - ${capitalizeText(localFiltersTn.mes)} ${new Date().getFullYear()}`
-      : 'TN por Cliente';
-    const { rows: titleRows, merges } = excelTitleRows(tnTitle, localFiltersTn, colCount);
-    const headerStyle = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: '1B7430' } }, alignment: { horizontal: 'center' } };
-    const cellStyle = { alignment: { horizontal: 'left' } };
-    const numStyle = { alignment: { horizontal: 'right' }, numFmt: '#,##0.00' };
-    const rows = [
-      ...titleRows,
-      [{ v: 'Cliente', s: headerStyle }, { v: 'Empresa', s: headerStyle }, { v: 'Peso Ticket (TN Recibida)', s: headerStyle }],
-      ...tnClienteEmpresa.map(item => [
-        { v: item.cliente || 'Sin cliente', s: cellStyle },
-        { v: formatEmpresa(item.empresa), s: cellStyle },
-        { v: Math.round((Number(item.total) || 0) * 100) / 100, t: 'n', s: numStyle },
-      ])
+
+    const { default: ExcelJS } = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('TN Cliente Empresa');
+    worksheet.columns = [
+      { width: 35 },
+      { width: 25 },
+      { width: 25 },
     ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 25 }];
-    ws['!merges'] = merges;
-    XLSX.utils.book_append_sheet(wb, ws, 'TN Cliente Empresa');
-    XLSX.writeFile(wb, 'TN_Cliente_Empresa.xlsx');
+
+    const tnTitle = localFiltersTn.mes
+      ? `TN TOTAL RECIBIDO / CLIENTE - ${capitalizeText(localFiltersTn.mes)} ${new Date().getFullYear()}`
+      : 'TN POR CLIENTE';
+
+    const headerRowNumber = await addExcelBranding({
+      workbook,
+      worksheet,
+      title: tnTitle,
+      filterObj: localFiltersTn,
+      colCount: 3,
+    });
+
+    const headerRow = worksheet.getRow(headerRowNumber);
+    headerRow.values = ['Cliente', 'Empresa', 'Peso Ticket (TN Recibida)'];
+    headerRow.height = 22;
+    for (let col = 1; col <= 3; col++) {
+      styleExcelHeaderCell(headerRow.getCell(col));
+    }
+
+    tnClienteEmpresa.forEach((item) => {
+      const row = worksheet.addRow([
+        item.cliente || 'Sin cliente',
+        formatEmpresa(item.empresa),
+        Math.round((Number(item.total) || 0) * 100) / 100,
+      ]);
+
+      styleExcelDataCell(row.getCell(1), 'left');
+      styleExcelDataCell(row.getCell(2), 'left');
+      styleExcelDataCell(row.getCell(3), 'right');
+      row.getCell(3).numFmt = '#,##0.00';
+    });
+
+    worksheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: headerRowNumber, column: 3 },
+    };
+
+    await downloadExcelWorkbook(workbook, 'TN_Cliente_Empresa.xlsx');
   };
 
   const formatEmpresa = (empresa) => {

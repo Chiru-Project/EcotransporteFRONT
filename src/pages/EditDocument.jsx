@@ -60,6 +60,8 @@ const EditDocument = () => {
 
   const esEcotransporte = (formData.empresa || '').toUpperCase().includes('ECOTRANSPORTE');
   const esTarifaFija = ((formData.cliente || '').toUpperCase().includes('NUKLEO') || (formData.cliente || '').toUpperCase().includes('PAY METAL'));
+  const tarifaSinAsignar = document?.precio_unitario === null || document?.precio_unitario === undefined || document?.precio_unitario === '';
+  const tarifaEsCero = !tarifaSinAsignar && Number(document?.precio_unitario) === 0;
 
   useEffect(() => {
     loadDocument();
@@ -335,12 +337,22 @@ const EditDocument = () => {
         </div>
       )}
 
-      {isAdmin && !document?.precio_unitario && (
+      {isAdmin && tarifaSinAsignar && (
         <div className="admin-warning-notice">
           <span>Atencion</span>
           <div>
             <strong>Documento incompleto</strong>
             <p>Este documento no tiene tarifa asignada. Puedes completar los campos financieros manualmente.</p>
+          </div>
+        </div>
+      )}
+
+      {isAdmin && tarifaEsCero && (
+        <div className="admin-warning-notice">
+          <span>Atencion</span>
+          <div>
+            <strong>Tarifa en 0.00</strong>
+            <p>La tarifa de este documento es 0.00 en el tarifario. Es una tarifa valida y no se considera incompleto.</p>
           </div>
         </div>
       )}
@@ -599,7 +611,7 @@ const EditDocument = () => {
               </div>
               <div className="readonly-item">
                 <span className="readonly-label">Precio Unitario con IGV:</span>
-                <span className="readonly-value">{document?.precio_unitario || '-'} {document?.divisa}</span>
+                <span className="readonly-value">{document?.precio_unitario !== null && document?.precio_unitario !== undefined && document?.precio_unitario !== '' ? document?.precio_unitario : '-'} {document?.divisa}</span>
               </div>
               <div className="readonly-item">
                 <span className="readonly-label">Precio Final:</span>
