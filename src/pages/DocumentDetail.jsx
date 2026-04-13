@@ -113,11 +113,14 @@ const DocumentDetail = () => {
         const faltantes = [];
         const tarifaSinAsignar = document.precio_unitario === null || document.precio_unitario === undefined || document.precio_unitario === '';
         const tarifaEsCero = !tarifaSinAsignar && Number(document.precio_unitario) === 0;
+        const empresaAsignada = String(document.empresa || '').trim();
         if (!document.cliente) faltantes.push('Cliente no identificado');
         if (!document.partida) faltantes.push('Punto de partida no identificado');
         if (!document.llegada) faltantes.push('Punto de llegada no identificado');
         if (!document.transportado) faltantes.push('Material transportado no reconocido');
+        if (!document.tn_enviado) faltantes.push('Peso y unidad de medida no identificada en la guia.');
         if (tarifaSinAsignar) faltantes.push('Tarifa no encontrada');
+        if (document.unidad && !empresaAsignada) faltantes.push('Placa no ligada a una empresa de transporte');
         if (!document.unidad) faltantes.push('Placa del vehículo no identificada');
         if (faltantes.length > 0) {
           return (

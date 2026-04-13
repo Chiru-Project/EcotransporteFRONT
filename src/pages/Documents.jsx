@@ -268,9 +268,12 @@ const Documents = () => {
 
     const hasMotivo = !!String(doc?.motivo || '').trim();
     const missingTarifa = doc?.precio_unitario === null || doc?.precio_unitario === undefined || doc?.precio_unitario === '';
+    const hasUnidad = !!String(doc?.unidad || '').trim();
+    const hasEmpresa = !!String(doc?.empresa || '').trim();
+    const placaSinEmpresa = hasUnidad && !hasEmpresa;
 
-    // Mantener misma regla visual que DocumentDetail: sin tarifa => incompleto.
-    return hasMotivo || missingTarifa;
+    // Mantener misma regla visual que DocumentDetail.
+    return hasMotivo || missingTarifa || placaSinEmpresa;
   };
 
   const incompleteCount = documents.filter(isIncomplete).length;
@@ -392,7 +395,7 @@ const Documents = () => {
           <button
             className={`btn-filter-incomplete${filterIncomplete ? ' active' : ''}`}
             onClick={() => { setFilterIncomplete(f => !f); setCurrentPage(1); }}
-            title="Mostrar solo documentos con datos incompletos (sin tarifa)"
+            title="Mostrar solo documentos con datos incompletos"
           >
             ⚠️ Incompletos
             {incompleteCount > 0 && (
