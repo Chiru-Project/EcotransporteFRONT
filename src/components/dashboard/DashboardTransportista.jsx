@@ -220,12 +220,7 @@ const DashboardTransportista = () => {
   };
 
   const descargarDetalleExcel = async () => {
-    const filtered = detalleTransportista.filter((item) => {
-      if (!divisaFiltro) return true;
-      if (divisaFiltro === 'USD') return (parseInt(item.cantidad_traslados_usd) || 0) > 0;
-      if (divisaFiltro === 'PEN') return (parseInt(item.cantidad_traslados_pen) || 0) > 0;
-      return true;
-    });
+    const filtered = detalleTransportista.filter(item => !divisaFiltro || (item.divisa_cost || 'PEN') === divisaFiltro);
     if (filtered.length === 0) return;
 
     const { default: ExcelJS } = await import('exceljs');
@@ -312,26 +307,19 @@ const DashboardTransportista = () => {
     filtered
       .sort((a, b) => (parseInt(b.cantidad_traslados) || 0) - (parseInt(a.cantidad_traslados) || 0))
       .forEach((item) => {
-        const totalUsd = parseFloat(item.precio_total_usd) || 0;
-        const totalPen = parseFloat(item.precio_total_pen) || 0;
         const divisa = item.divisa_cost || 'PEN';
-        const precioText =
-          divisa === 'USD'
-            ? `$ ${fmtNum(totalUsd)}`
-            : divisa === 'PEN'
-              ? `S/ ${fmtNum(totalPen)}`
-              : `$ ${fmtNum(totalUsd)} | S/ ${fmtNum(totalPen)}`;
 
         const row = worksheet.addRow({
           transportista: item.transportista || 'Sin asignar',
           traslados: parseInt(item.cantidad_traslados) || 0,
           peso: Math.round((parseFloat(item.tn_recibido) || 0) * 100) / 100,
           divisa,
-          precio: precioText,
+          precio: Math.round((parseFloat(item.precio_total) || 0) * 100) / 100,
         });
 
         row.getCell(2).numFmt = '#,##0';
         row.getCell(3).numFmt = '#,##0.00';
+        row.getCell(5).numFmt = '#,##0.00';
 
         row.eachCell((cell, colNumber) => {
           cell.border = {
@@ -486,7 +474,7 @@ const DashboardTransportista = () => {
     return `${day}/${month}/${year}`;
   };
 
-  const makeDetalleKey = (transportista) => normalizeName(transportista) || 'SIN ASIGNAR';
+  const makeDetalleKey = (transportista, divisa) => `${normalizeName(transportista) || 'SIN ASIGNAR'}|${divisa || 'PEN'}`;
 
   const toggleTransportista = (key) => {
     setExpandedTransportistas((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -494,16 +482,8 @@ const DashboardTransportista = () => {
 
   const getViajesForItem = (item) => {
     const transportista = normalizeName(item.transportista);
-    return (detalleTransportistaViajes || []).filter((v) => normalizeName(v.transportista) === transportista);
-  };
-
-  const formatResumenPrecio = (item) => {
-    const usd = parseFloat(item.precio_total_usd) || 0;
-    const pen = parseFloat(item.precio_total_pen) || 0;
     const divisa = item.divisa_cost || 'PEN';
-    if (divisa === 'USD') return `$ ${fmtNum(usd)}`;
-    if (divisa === 'PEN') return `S/ ${fmtNum(pen)}`;
-    return `$ ${fmtNum(usd)} | S/ ${fmtNum(pen)}`;
+    return (detalleTransportistaViajes || []).filter((v) => normalizeName(v.transportista) === transportista && (v.divisa_cost || 'PEN') === divisa);
   };
 
   const getRecorridoLabel = (viaje) => {
@@ -597,14 +577,9 @@ const DashboardTransportista = () => {
               </thead>
               <tbody>
                 {[...detalleTransportista]
-                  .filter((item) => {
-                    if (!divisaFiltro) return true;
-                    if (divisaFiltro === 'USD') return (parseInt(item.cantidad_traslados_usd) || 0) > 0;
-                    if (divisaFiltro === 'PEN') return (parseInt(item.cantidad_traslados_pen) || 0) > 0;
-                    return true;
-                  })
+                  .filter(item => !divisaFiltro || (item.divisa_cost || 'PEN') === divisaFiltro)
                   .sort((a, b) => (parseInt(b.cantidad_traslados) || 0) - (parseInt(a.cantidad_traslados) || 0)).map((item) => {
-                    const rowKey = makeDetalleKey(item.transportista);
+                    const rowKey = makeDetalleKey(item.transportista, item.divisa_cost);
                     const isExpanded = !!expandedTransportistas[rowKey];
                     const viajes = isExpanded ? getViajesForItem(item) : [];
                     return (
@@ -619,7 +594,7 @@ const DashboardTransportista = () => {
                           <td>{item.cantidad_traslados}</td>
                           <td>{fmtNum(item.tn_recibido)}</td>
                           <td>{(item.divisa_cost || 'PEN')}</td>
-                          <td>{formatResumenPrecio(item)}</td>
+                          <td>{(item.divisa_cost || 'PEN') === 'USD' ? '$' : 'S/'} {(parseFloat(item.precio_total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
                         <AnimatePresence initial={false}>
                           {isExpanded && (
@@ -633,7 +608,7 @@ const DashboardTransportista = () => {
                                   transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                                 >
                                 <div className="transportista-curtain-meta">
-                                  <strong>{item.transportista || 'Sin asignar'}</strong> | {item.cantidad_traslados} traslados | {fmtNum(item.tn_recibido)} TN | {formatResumenPrecio(item)}
+                                  <strong>{item.transportista || 'Sin asignar'}</strong> | {item.cantidad_traslados} traslados | {fmtNum(item.tn_recibido)} TN | {(item.divisa_cost || 'PEN') === 'USD' ? '$' : 'S/'} {(parseFloat(item.precio_total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                                 {viajes.length === 0 ? (
                                   <div className="transportista-empty-detail">No hay detalle de traslados para este transportista.</div>
